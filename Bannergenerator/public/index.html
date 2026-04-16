@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Banner Generator</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body>
+  <div class="app-layout">
+
+    <!-- ── Sidebar ── -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <span class="logo-icon">&#9670;</span>
+        <span class="logo-text">Banner Generator</span>
+      </div>
+
+      <!-- Analyze Form -->
+      <section class="panel">
+        <h2 class="panel-title">Generate from Website</h2>
+        <form id="analyzeForm">
+          <div class="field">
+            <label for="websiteUrl">Website URL</label>
+            <input type="url" id="websiteUrl" placeholder="https://example.com" required>
+          </div>
+          <div class="field">
+            <label for="facebookUrl">Facebook URL <span class="optional">(optional)</span></label>
+            <input type="url" id="facebookUrl" placeholder="https://facebook.com/page">
+          </div>
+          <button type="submit" id="analyzeBtn" class="btn btn-primary btn-full">
+            <span id="analyzeBtnText">Analyze &amp; Generate</span>
+            <span id="analyzeSpinner" class="spinner hidden"></span>
+          </button>
+        </form>
+        <div id="errorMessage" class="error-msg hidden"></div>
+      </section>
+
+      <!-- Background Image Selector (shown after analysis) -->
+      <section class="panel hidden" id="imagePanel">
+        <h2 class="panel-title">Background Image</h2>
+        <p class="panel-hint">Click an image to use as background</p>
+        <div id="imageGrid" class="image-grid"></div>
+        <div class="field" style="margin-top:10px">
+          <label for="customImageUrl">Or enter image URL</label>
+          <div class="input-row">
+            <input type="url" id="customImageUrl" placeholder="https://...">
+            <button id="useCustomImageBtn" class="btn btn-sm">Use</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Saved Banners -->
+      <section class="panel">
+        <h2 class="panel-title">Saved Banners</h2>
+        <div id="savedBannersList" class="saved-list">
+          <p class="empty-hint">No saved banners yet.</p>
+        </div>
+      </section>
+    </aside>
+
+    <!-- ── Main Content ── -->
+    <main class="main-content">
+
+      <!-- Banner Preview -->
+      <div class="preview-section">
+        <div class="preview-label">Preview <span class="preview-size">600 &times; 320 px</span></div>
+        <div class="preview-outer">
+          <div id="bannerPreview" class="banner-preview">
+            <!-- Overlay layer -->
+            <div id="bannerOverlay" class="banner-overlay"></div>
+            <!-- Content layer -->
+            <div class="banner-content" id="bannerContent">
+              <div id="previewCompanyName" class="banner-company"></div>
+              <div id="previewHeadline" class="banner-headline">Your Banner Headline</div>
+              <div id="previewSubtext" class="banner-subtext">Supporting text will appear here after analysis</div>
+              <div id="previewTagline" class="banner-tagline"></div>
+              <div class="banner-cta-row">
+                <div id="previewCta" class="banner-cta">Learn More</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Editor Panel (shown after analysis or when loading a saved banner) -->
+      <div id="editorPanel" class="editor-panel">
+
+        <!-- Tab bar -->
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="text">Text</button>
+          <button class="tab-btn" data-tab="design">Design</button>
+          <button class="tab-btn" data-tab="typography">Typography</button>
+        </div>
+
+        <!-- Text Tab -->
+        <div class="tab-content active" id="tab-text">
+          <div class="editor-grid-2">
+            <div class="field">
+              <label>Company Name</label>
+              <input type="text" id="editCompanyName" placeholder="Acme Corp">
+            </div>
+            <div class="field">
+              <label>Tagline</label>
+              <input type="text" id="editTagline" placeholder="Short memorable tagline">
+            </div>
+            <div class="field span-2">
+              <label>Headline</label>
+              <input type="text" id="editHeadline" placeholder="Bold banner headline">
+            </div>
+            <div class="field span-2">
+              <label>Subtext</label>
+              <textarea id="editSubtext" rows="2" placeholder="Supporting description text"></textarea>
+            </div>
+            <div class="field">
+              <label>CTA Button Text</label>
+              <input type="text" id="editCta" placeholder="Learn More">
+            </div>
+            <div class="field">
+              <label>Show CTA Button</label>
+              <label class="toggle">
+                <input type="checkbox" id="editShowCta" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Design Tab -->
+        <div class="tab-content" id="tab-design">
+          <div class="editor-grid-3">
+            <div class="field">
+              <label>Text Color</label>
+              <div class="color-row">
+                <input type="color" id="editPrimaryColor" value="#ffffff">
+                <input type="text" id="editPrimaryColorHex" class="hex-input" value="#ffffff" maxlength="7">
+              </div>
+            </div>
+            <div class="field">
+              <label>Accent Color</label>
+              <div class="color-row">
+                <input type="color" id="editSecondaryColor" value="#f0c040">
+                <input type="text" id="editSecondaryColorHex" class="hex-input" value="#f0c040" maxlength="7">
+              </div>
+            </div>
+            <div class="field">
+              <label>CTA Button Color</label>
+              <div class="color-row">
+                <input type="color" id="editCtaColor" value="#6c63ff">
+                <input type="text" id="editCtaColorHex" class="hex-input" value="#6c63ff" maxlength="7">
+              </div>
+            </div>
+            <div class="field">
+              <label>Overlay Color</label>
+              <div class="color-row">
+                <input type="color" id="editOverlayColor" value="#000000">
+                <input type="text" id="editOverlayColorHex" class="hex-input" value="#000000" maxlength="7">
+              </div>
+            </div>
+            <div class="field span-2">
+              <label>Overlay Opacity — <span id="opacityValue">50%</span></label>
+              <input type="range" id="editOverlayOpacity" min="0" max="1" step="0.01" value="0.5" class="range-input">
+            </div>
+            <div class="field span-3">
+              <label>Background Fallback Color (no image)</label>
+              <div class="color-row">
+                <input type="color" id="editBgColor" value="#1a1a2e">
+                <input type="text" id="editBgColorHex" class="hex-input" value="#1a1a2e" maxlength="7">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Typography Tab -->
+        <div class="tab-content" id="tab-typography">
+          <div class="editor-grid-2">
+            <div class="field">
+              <label>Headline Size — <span id="headlineSizeValue">32px</span></label>
+              <input type="range" id="editHeadlineSize" min="16" max="62" value="32" class="range-input">
+            </div>
+            <div class="field">
+              <label>Subtext Size — <span id="subtextSizeValue">16px</span></label>
+              <input type="range" id="editSubtextSize" min="10" max="28" value="16" class="range-input">
+            </div>
+            <div class="field">
+              <label>Company Name Size — <span id="companySizeValue">12px</span></label>
+              <input type="range" id="editCompanySize" min="8" max="24" value="12" class="range-input">
+            </div>
+            <div class="field">
+              <label>Tagline Size — <span id="taglineSizeValue">13px</span></label>
+              <input type="range" id="editTaglineSize" min="8" max="22" value="13" class="range-input">
+            </div>
+            <div class="field">
+              <label>Headline Weight</label>
+              <select id="editHeadlineWeight" class="select-input">
+                <option value="700">Bold</option>
+                <option value="800">Extra Bold</option>
+                <option value="900">Black</option>
+                <option value="600">Semi Bold</option>
+                <option value="400">Regular</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Text Alignment</label>
+              <select id="editTextAlign" class="select-input">
+                <option value="center">Center</option>
+                <option value="left">Left</option>
+                <option value="right">Right</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="action-bar">
+          <div class="action-left">
+            <input type="text" id="bannerName" class="banner-name-input" placeholder="Banner name...">
+          </div>
+          <div class="action-right">
+            <button id="newBannerBtn" class="btn btn-ghost">New Banner</button>
+            <button id="saveBannerBtn" class="btn btn-secondary">Save</button>
+            <button id="downloadBtn" class="btn btn-primary">Download PNG</button>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
