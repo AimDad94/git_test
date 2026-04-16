@@ -65,21 +65,17 @@
 
       <!-- Banner Preview -->
       <div class="preview-section">
-        <div class="preview-label">Preview <span class="preview-size">600 &times; 320 px</span></div>
+        <div class="preview-label">Preview <span class="preview-size">600 &times; 320 px</span> <span class="drag-hint">&#8592; drag elements to reposition</span></div>
         <div class="preview-outer">
           <div id="bannerPreview" class="banner-preview">
             <!-- Overlay layer -->
             <div id="bannerOverlay" class="banner-overlay"></div>
-            <!-- Content layer -->
-            <div class="banner-content" id="bannerContent">
-              <div id="previewCompanyName" class="banner-company"></div>
-              <div id="previewHeadline" class="banner-headline">Your Banner Headline</div>
-              <div id="previewSubtext" class="banner-subtext">Supporting text will appear here after analysis</div>
-              <div id="previewTagline" class="banner-tagline"></div>
-              <div class="banner-cta-row">
-                <div id="previewCta" class="banner-cta">Learn More</div>
-              </div>
-            </div>
+            <!-- Draggable elements — positioned absolutely by JS -->
+            <div id="previewCompanyName" class="banner-el banner-company" data-element="companyName"></div>
+            <div id="previewHeadline"    class="banner-el banner-headline" data-element="headline">Your Banner Headline</div>
+            <div id="previewSubtext"     class="banner-el banner-subtext"  data-element="subtext">Supporting text will appear here after analysis</div>
+            <div id="previewTagline"     class="banner-el banner-tagline"  data-element="tagline"></div>
+            <div id="previewCta"         class="banner-el banner-cta"      data-element="cta">Learn More</div>
           </div>
         </div>
       </div>
@@ -218,6 +214,7 @@
             <input type="text" id="bannerName" class="banner-name-input" placeholder="Banner name...">
           </div>
           <div class="action-right">
+            <button id="resetPositionsBtn" class="btn btn-ghost">Reset Positions</button>
             <button id="newBannerBtn" class="btn btn-ghost">New Banner</button>
             <button id="saveBannerBtn" class="btn btn-secondary">Save</button>
             <button id="downloadBtn" class="btn btn-primary">Download PNG</button>

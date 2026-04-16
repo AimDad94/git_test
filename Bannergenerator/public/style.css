@@ -365,6 +365,14 @@ body {
   color: #94a3b8;
 }
 
+.drag-hint {
+  font-weight: 400;
+  margin-left: 10px;
+  color: #b0bec5;
+  font-style: italic;
+  font-size: 11px;
+}
+
 .preview-outer {
   display: inline-block;
   border-radius: var(--radius);
@@ -393,17 +401,32 @@ body {
   background: rgba(0,0,0,.5);
 }
 
-.banner-content {
-  position: relative;
+/* All banner text elements are absolutely positioned and draggable */
+.banner-el {
+  position: absolute;
   z-index: 2;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  padding: 32px 40px;
-  text-align: center;
+  transform: translate(-50%, -50%);
+  cursor: grab;
+  user-select: none;
+  white-space: nowrap;           /* single-line by default; subtext overrides */
 }
+
+/* Show a subtle outline on hover so the user knows it's draggable */
+.banner-el:hover {
+  outline: 1px dashed rgba(255,255,255,.45);
+  outline-offset: 5px;
+}
+
+/* Active drag state */
+.banner-el.is-dragging {
+  cursor: grabbing !important;
+  outline: 1.5px dashed rgba(108,99,255,.9);
+  outline-offset: 5px;
+  opacity: .88;
+}
+
+/* Prevent text selection on the whole banner while dragging */
+.banner-preview.is-dragging { cursor: grabbing; }
 
 .banner-company {
   font-size: 12px;
@@ -411,8 +434,7 @@ body {
   letter-spacing: 2.5px;
   text-transform: uppercase;
   color: #fff;
-  opacity: .75;
-  margin-bottom: 6px;
+  opacity: .8;
 }
 
 .banner-headline {
@@ -420,7 +442,9 @@ body {
   font-weight: 700;
   line-height: 1.2;
   color: #fff;
-  margin-bottom: 10px;
+  max-width: 540px;
+  white-space: normal;
+  text-align: center;
   word-break: break-word;
 }
 
@@ -428,8 +452,9 @@ body {
   font-size: 16px;
   color: rgba(255,255,255,.88);
   line-height: 1.5;
-  margin-bottom: 16px;
-  max-width: 480px;
+  max-width: 500px;
+  white-space: normal;
+  text-align: center;
   word-break: break-word;
 }
 
@@ -437,12 +462,6 @@ body {
   font-size: 13px;
   font-style: italic;
   color: rgba(255,255,255,.65);
-  margin-top: 10px;
-}
-
-.banner-cta-row {
-  display: flex;
-  justify-content: center;
 }
 
 .banner-cta {
@@ -453,7 +472,7 @@ body {
   letter-spacing: .4px;
   background: var(--accent);
   color: #fff;
-  cursor: default;
+  white-space: nowrap;
 }
 
 /* ── Editor Panel ─────────────────────────────────────────────────────────── */

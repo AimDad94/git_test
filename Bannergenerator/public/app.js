@@ -1,3 +1,20 @@
+/* ── Default element positions (center-point x,y within 600×320 banner) ─── */
+const DEFAULT_POSITIONS = {
+  companyName: { x: 300, y: 42  },
+  headline:    { x: 300, y: 135 },
+  subtext:     { x: 300, y: 198 },
+  cta:         { x: 300, y: 258 },
+  tagline:     { x: 300, y: 296 },
+};
+
+function clonePositions(src) {
+  const out = {};
+  for (const k of Object.keys(DEFAULT_POSITIONS)) {
+    out[k] = src && src[k] ? { ...src[k] } : { ...DEFAULT_POSITIONS[k] };
+  }
+  return out;
+}
+
 /* ── State ──────────────────────────────────────────────────────────────── */
 const state = {
   // Sourced from analysis
@@ -26,6 +43,8 @@ const state = {
   taglineSize: 13,
   headlineWeight: '700',
   textAlign: 'center',
+  // Element positions
+  positions: clonePositions(),
   // Persistence
   currentBannerId: null,
   bannerName: '',
@@ -38,30 +57,27 @@ const $ = (id) => document.getElementById(id);
 function renderPreview() {
   const preview = $('bannerPreview');
   const overlay = $('bannerOverlay');
-  const content = $('bannerContent');
 
   // Background
-  if (state.selectedImageBase64) {
-    preview.style.backgroundImage = `url(${state.selectedImageBase64})`;
-  } else {
-    preview.style.backgroundImage = 'none';
-  }
+  preview.style.backgroundImage = state.selectedImageBase64
+    ? `url(${state.selectedImageBase64})` : 'none';
   preview.style.backgroundColor = state.bgColor;
 
   // Overlay
   const { r, g, b } = hexToRgb(state.overlayColor);
   overlay.style.backgroundColor = `rgba(${r},${g},${b},${state.overlayOpacity})`;
 
-  // Text alignment
-  content.style.alignItems = state.textAlign === 'left' ? 'flex-start'
-    : state.textAlign === 'right' ? 'flex-end' : 'center';
-  content.style.textAlign = state.textAlign;
+  // ── Position + style each draggable element ──────────────────────────────
+  const pos = state.positions;
 
   // Company name
   const company = $('previewCompanyName');
   company.textContent = state.companyName;
   company.style.color = state.primaryColor;
   company.style.fontSize = state.companySize + 'px';
+  company.style.left = pos.companyName.x + 'px';
+  company.style.top  = pos.companyName.y + 'px';
+  company.style.textAlign = state.textAlign;
   company.style.display = state.companyName ? '' : 'none';
 
   // Headline
@@ -70,27 +86,83 @@ function renderPreview() {
   headline.style.color = state.primaryColor;
   headline.style.fontSize = state.headlineSize + 'px';
   headline.style.fontWeight = state.headlineWeight;
+  headline.style.left = pos.headline.x + 'px';
+  headline.style.top  = pos.headline.y + 'px';
+  headline.style.textAlign = state.textAlign;
 
   // Subtext
   const subtext = $('previewSubtext');
   subtext.textContent = state.subtext;
   subtext.style.color = state.primaryColor;
   subtext.style.fontSize = state.subtextSize + 'px';
+  subtext.style.left = pos.subtext.x + 'px';
+  subtext.style.top  = pos.subtext.y + 'px';
+  subtext.style.textAlign = state.textAlign;
   subtext.style.display = state.subtext ? '' : 'none';
-
-  // Tagline
-  const tagline = $('previewTagline');
-  tagline.textContent = state.tagline;
-  tagline.style.color = state.secondaryColor;
-  tagline.style.fontSize = state.taglineSize + 'px';
-  tagline.style.display = state.tagline ? '' : 'none';
 
   // CTA
   const cta = $('previewCta');
   cta.textContent = state.ctaText;
   cta.style.backgroundColor = state.ctaColor;
   cta.style.color = state.primaryColor;
-  cta.parentElement.style.display = state.showCta ? '' : 'none';
+  cta.style.left = pos.cta.x + 'px';
+  cta.style.top  = pos.cta.y + 'px';
+  cta.style.display = state.showCta ? '' : 'none';
+
+  // Tagline
+  const tagline = $('previewTagline');
+  tagline.textContent = state.tagline;
+  tagline.style.color = state.secondaryColor;
+  tagline.style.fontSize = state.taglineSize + 'px';
+  tagline.style.left = pos.tagline.x + 'px';
+  tagline.style.top  = pos.tagline.y + 'px';
+  tagline.style.textAlign = state.textAlign;
+  tagline.style.display = state.tagline ? '' : 'none';
+}
+
+/* ── Drag to reposition ──────────────────────────────────────────────────── */
+const drag = { active: false, key: null, offsetX: 0, offsetY: 0 };
+
+function initDragging() {
+  const preview = $('bannerPreview');
+
+  preview.addEventListener('mousedown', (e) => {
+    const el = e.target.closest('.banner-el');
+    if (!el) return;
+    e.preventDefault();
+
+    const key = el.dataset.element;
+    const rect = preview.getBoundingClientRect();
+    const pos = state.positions[key];
+
+    drag.active  = true;
+    drag.key     = key;
+    drag.offsetX = (e.clientX - rect.left) - pos.x;
+    drag.offsetY = (e.clientY - rect.top)  - pos.y;
+
+    el.classList.add('is-dragging');
+    preview.classList.add('is-dragging');
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!drag.active) return;
+
+    const rect = $('bannerPreview').getBoundingClientRect();
+    const x = clamp((e.clientX - rect.left) - drag.offsetX, 0, 600);
+    const y = clamp((e.clientY - rect.top)  - drag.offsetY, 0, 320);
+
+    state.positions[drag.key] = { x, y };
+    renderPreview();
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!drag.active) return;
+    document.querySelector(`[data-element="${drag.key}"]`)
+      ?.classList.remove('is-dragging');
+    $('bannerPreview').classList.remove('is-dragging');
+    drag.active = false;
+    drag.key    = null;
+  });
 }
 
 /* ── Sync editors → state → render ──────────────────────────────────────── */
@@ -208,6 +280,7 @@ async function handleAnalyze(e) {
       selectedImageBase64: null,
       currentBannerId: null,
       bannerName:     analysis.companyName || '',
+      positions:      clonePositions(),
     });
 
     populateEditors();
@@ -298,6 +371,7 @@ async function handleSave() {
     textAlign: state.textAlign,
     selectedImageBase64: state.selectedImageBase64,
     imageUrls: state.images.map((i) => i.url),
+    positions: state.positions,
   };
 
   try {
@@ -447,6 +521,7 @@ function loadBanner(b) {
     images:              (b.imageUrls || []).map((url) => ({ url, base64: null })),
     currentBannerId:     b.id,
     bannerName:          b.name || b.companyName || '',
+    positions:           clonePositions(b.positions),
   });
 
   // If saved banner had images, populate grid too
@@ -499,6 +574,7 @@ function resetBanner() {
     images: [],
     currentBannerId: null,
     bannerName: '',
+    positions: clonePositions(),
   });
   populateEditors();
   renderPreview();
@@ -633,6 +709,13 @@ function init() {
   $('saveBannerBtn').addEventListener('click', handleSave);
   $('downloadBtn').addEventListener('click', handleDownload);
   $('newBannerBtn').addEventListener('click', resetBanner);
+  $('resetPositionsBtn').addEventListener('click', () => {
+    state.positions = clonePositions();
+    renderPreview();
+  });
+
+  // Drag to reposition
+  initDragging();
 
   // Saved banners — event delegation
   $('savedBannersList').addEventListener('click', handleSavedItemClick);
