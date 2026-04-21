@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CRM Manager — Contact Priority</title>
+<style>
+  :root {
+    --bg: #f7f8fa;
+    --card: #ffffff;
+    --border: #e5e7eb;
+    --text: #111827;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --danger: #dc2626;
+    --warn: #d97706;
+    --ok: #059669;
+    --row-hover: #f3f4f6;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px; line-height: 1.4; }
+  header { background: var(--card); border-bottom: 1px solid var(--border); padding: 20px 28px; }
+  header h1 { margin: 0 0 4px; font-size: 20px; font-weight: 600; }
+  header p { margin: 0; color: var(--muted); font-size: 13px; }
+  main { max-width: 1280px; margin: 24px auto; padding: 0 24px; }
+  .toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+  .toolbar input[type="search"] {
+    flex: 1; min-width: 220px; padding: 9px 12px; border: 1px solid var(--border);
+    border-radius: 8px; background: var(--card); font-size: 14px; outline: none;
+  }
+  .toolbar input[type="search"]:focus { border-color: var(--accent); }
+  .toolbar .stats { color: var(--muted); font-size: 13px; }
+  .toolbar button {
+    padding: 9px 14px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--card); cursor: pointer; font-size: 13px; font-weight: 500;
+  }
+  .toolbar button:hover { background: var(--row-hover); }
+
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th { text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase;
+    letter-spacing: 0.04em; color: var(--muted); padding: 12px 14px;
+    border-bottom: 1px solid var(--border); background: #fafafa; }
+  tbody td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: var(--row-hover); }
+  tbody tr.expanded { background: #f9fafb; }
+
+  .rank { font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 500; width: 44px; }
+  .name { font-weight: 500; }
+  .mrr { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .since { font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--muted); font-size: 12px; }
+
+  .score { display: inline-flex; align-items: center; justify-content: center;
+    min-width: 42px; padding: 4px 8px; border-radius: 6px;
+    font-variant-numeric: tabular-nums; font-weight: 600; font-size: 13px; }
+  .score-hi { background: #fee2e2; color: var(--danger); }
+  .score-md { background: #fef3c7; color: var(--warn); }
+  .score-lo { background: #ecfdf5; color: var(--ok); }
+
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px;
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+  .pill-never { background: #fee2e2; color: var(--danger); }
+  .pill-old { background: #fef3c7; color: var(--warn); }
+  .pill-recent { background: #d1fae5; color: var(--ok); }
+  .pill-unpaid { background: #fee2e2; color: var(--danger); }
+  .pill-bound { background: #e0e7ff; color: #4338ca; }
+
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: middle; }
+  .dot-red { background: #dc2626; }
+  .dot-yellow { background: #f59e0b; }
+  .dot-green { background: #10b981; }
+  .dot-none { background: #d1d5db; }
+
+  .muted { color: var(--muted); font-size: 12px; }
+
+  .breakdown { background: #fafafa; padding: 14px 18px 18px 58px; }
+  .breakdown h4 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase;
+    letter-spacing: 0.04em; color: var(--muted); font-weight: 600; }
+  .bars { display: grid; grid-template-columns: 140px 1fr 60px; row-gap: 6px; column-gap: 10px;
+    align-items: center; font-size: 12px; max-width: 560px; }
+  .bar-label { color: var(--muted); }
+  .bar-track { background: #e5e7eb; border-radius: 4px; height: 8px; overflow: hidden; }
+  .bar-fill { height: 100%; background: var(--accent); border-radius: 4px; }
+  .bar-val { font-variant-numeric: tabular-nums; text-align: right; color: var(--text); }
+
+  .state { padding: 40px; text-align: center; color: var(--muted); }
+  .state.error { color: var(--danger); }
+</style>
+</head>
+<body>
+<header>
+  <h1>CRM Manager — Contact Priority</h1>
+  <p>Active customers ranked by a weighted score across call recency, satisfaction, MRR, invoices, products, and binding. Click a row for the breakdown.</p>
+</header>
+<main>
+  <div class="toolbar">
+    <input id="search" type="search" placeholder="Search by customer name or site…">
+    <span class="stats" id="stats"></span>
+    <button id="refresh">Refresh</button>
+  </div>
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th class="rank">#</th>
+          <th>Score</th>
+          <th>Customer</th>
+          <th>Last called</th>
+          <th>Sat.</th>
+          <th>MRR</th>
+          <th>Invoice</th>
+          <th>Products</th>
+          <th>Binding</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr><td colspan="9" class="state">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+<script>
+  const MAX_SCORE = 100;
+  const WEIGHTS = { call: 40, satisfaction: 20, mrr: 15, invoice: 10, products: 8, binding: 7 };
+  const SIGNAL_LABELS = {
+    call: 'Last called',
+    satisfaction: 'Satisfaction',
+    mrr: 'MRR',
+    invoice: 'Invoice status',
+    products: 'Products (inverse)',
+    binding: 'Binding (inverse)'
+  };
+
+  const tbody = document.getElementById('tbody');
+  const stats = document.getElementById('stats');
+  const search = document.getElementById('search');
+  const refreshBtn = document.getElementById('refresh');
+
+  let all = [];
+
+  const fmtMRR = v => v == null ? '—' :
+    new Intl.NumberFormat('da-DK', { style: 'currency', currency: 'DKK', maximumFractionDigits: 0 }).format(v);
+
+  function daysSince(iso) {
+    if (!iso) return null;
+    return Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  }
+
+  function lastCallCell(iso) {
+    const d = daysSince(iso);
+    if (d == null) return '<span class="pill pill-never">Never</span>';
+    const date = new Date(iso).toLocaleDateString('da-DK');
+    const cls = d >= 30 ? 'pill-old' : 'pill-recent';
+    return `<span class="pill ${cls}">${d}d</span> <span class="since">${date}</span>`;
+  }
+
+  function satisfactionCell(s) {
+    const map = { Red: 'dot-red', Yellow: 'dot-yellow', Green: 'dot-green' };
+    const cls = map[s] || 'dot-none';
+    const label = s || 'Unknown';
+    return `<span class="dot ${cls}" title="${label}"></span>`;
+  }
+
+  function invoiceCell(status) {
+    if (status === 'has_unpaid') return '<span class="pill pill-unpaid">Unpaid</span>';
+    return '<span class="muted">Paid</span>';
+  }
+
+  function bindingCell(bp) {
+    const end = bp && bp.end;
+    const active = end && new Date(end).getTime() > Date.now();
+    if (!active) return '<span class="muted">—</span>';
+    const endDate = new Date(end).toLocaleDateString('da-DK');
+    return `<span class="pill pill-bound" title="Ends ${endDate}">Active</span>`;
+  }
+
+  function scoreClass(total) {
+    if (total >= 60) return 'score-hi';
+    if (total >= 35) return 'score-md';
+    return 'score-lo';
+  }
+
+  function escape(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function breakdownRow(p) {
+    const rows = Object.entries(p.breakdown).map(([k, v]) => {
+      const max = WEIGHTS[k];
+      const pct = (v / max) * 100;
+      return `
+        <div class="bar-label">${SIGNAL_LABELS[k]}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct.toFixed(0)}%"></div></div>
+        <div class="bar-val">${v.toFixed(1)} / ${max}</div>
+      `;
+    }).join('');
+    return `
+      <tr class="breakdown-row"><td colspan="9">
+        <div class="breakdown">
+          <h4>Priority breakdown — total ${p.total.toFixed(1)} / ${MAX_SCORE}</h4>
+          <div class="bars">${rows}</div>
+        </div>
+      </td></tr>
+    `;
+  }
+
+  function render(items) {
+    if (!items.length) {
+      tbody.innerHTML = '<tr><td colspan="9" class="state">No customers match.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = items.map((c, i) => `
+      <tr data-idx="${i}">
+        <td class="rank">${i + 1}</td>
+        <td><span class="score ${scoreClass(c.priority.total)}">${c.priority.total.toFixed(0)}</span></td>
+        <td class="name">${escape(c.customerName)}</td>
+        <td>${lastCallCell(c.lastCallDate)}</td>
+        <td>${satisfactionCell(c.satisfactionScore)}</td>
+        <td class="mrr">${fmtMRR(c.mrr)}</td>
+        <td>${invoiceCell(c.invoiceStatus)}</td>
+        <td class="muted">${(c.products || []).length}</td>
+        <td>${bindingCell(c.bindingPeriod)}</td>
+      </tr>
+    `).join('');
+
+    tbody.querySelectorAll('tr[data-idx]').forEach(tr => {
+      tr.addEventListener('click', () => {
+        const idx = +tr.dataset.idx;
+        const next = tr.nextElementSibling;
+        if (next && next.classList.contains('breakdown-row')) {
+          next.remove();
+          tr.classList.remove('expanded');
+          return;
+        }
+        tbody.querySelectorAll('.breakdown-row').forEach(r => {
+          r.previousElementSibling?.classList.remove('expanded');
+          r.remove();
+        });
+        tr.classList.add('expanded');
+        tr.insertAdjacentHTML('afterend', breakdownRow(items[idx].priority));
+      });
+    });
+  }
+
+  function applyFilter() {
+    const q = search.value.trim().toLowerCase();
+    if (!q) return render(all);
+    const filtered = all.filter(c =>
+      (c.customerName || '').toLowerCase().includes(q) ||
+      (c.sites || []).some(s => s.toLowerCase().includes(q))
+    );
+    render(filtered);
+  }
+
+  async function load() {
+    tbody.innerHTML = '<tr><td colspan="9" class="state">Loading…</td></tr>';
+    stats.textContent = '';
+    try {
+      const res = await fetch('/api/customers');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      all = data.items;
+      const never = all.filter(c => !c.lastCallDate).length;
+      const red = all.filter(c => c.satisfactionScore === 'Red').length;
+      const unpaid = all.filter(c => c.invoiceStatus === 'has_unpaid').length;
+      stats.textContent = `${data.total} customers · ${never} never called · ${red} red · ${unpaid} unpaid`;
+      applyFilter();
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="9" class="state error">Failed to load: ${escape(err.message)}</td></tr>`;
+    }
+  }
+
+  search.addEventListener('input', applyFilter);
+  refreshBtn.addEventListener('click', load);
+  load();
+</script>
+</body>
+</html>
