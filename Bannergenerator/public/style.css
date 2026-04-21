@@ -3,16 +3,16 @@
 
 :root {
   --sidebar-w: 320px;
-  --bg: #f0f2f7;
-  --sidebar-bg: #1e2235;
-  --sidebar-header-bg: #16192a;
+  --bg: #f4f6f9;
+  --sidebar-bg: #1a2232;
+  --sidebar-header-bg: #141c2b;
   --panel-bg: #ffffff;
   --border: #e2e8f0;
-  --text: #1a202c;
+  --text: #2d3748;
   --text-muted: #64748b;
-  --accent: #6c63ff;
-  --accent-hover: #5a52e0;
-  --success: #10b981;
+  --accent: #1abc9c;
+  --accent-hover: #17a589;
+  --success: #1abc9c;
   --danger: #ef4444;
   --radius: 8px;
   --radius-sm: 5px;
@@ -351,6 +351,8 @@ body {
 .preview-section {}
 
 .preview-label {
+  display: flex;
+  align-items: center;
   font-size: 12px;
   font-weight: 600;
   color: var(--text-muted);
@@ -373,6 +375,19 @@ body {
   font-size: 11px;
 }
 
+.format-select {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 12px;
+  font-family: var(--font);
+  padding: 5px 8px;
+  cursor: pointer;
+  margin-right: 8px;
+}
+.format-select:focus { outline: none; border-color: var(--accent); }
+
 .preview-outer {
   display: inline-block;
   border-radius: var(--radius);
@@ -380,10 +395,8 @@ body {
   overflow: hidden;
 }
 
-/* THE BANNER — exact dimensions for export */
+/* THE BANNER — dimensions set by JS via applyFormat() */
 .banner-preview {
-  width: 600px;
-  height: 320px;
   position: relative;
   overflow: hidden;
   background-color: #1a1a2e;
@@ -420,7 +433,7 @@ body {
 /* Active drag state */
 .banner-el.is-dragging {
   cursor: grabbing !important;
-  outline: 1.5px dashed rgba(108,99,255,.9);
+  outline: 1.5px dashed rgba(26,188,156,.9);
   outline-offset: 5px;
   opacity: .88;
 }
@@ -557,7 +570,7 @@ body {
 .tab-content .select-input:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(108,99,255,.1);
+  box-shadow: 0 0 0 3px rgba(26,188,156,.1);
 }
 
 .tab-content .field input::placeholder,

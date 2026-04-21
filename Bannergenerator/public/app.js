@@ -1,3 +1,12 @@
+/* ── Banner formats ──────────────────────────────────────────────────────── */
+const FORMATS = [
+  { id: '300x160',  label: '300×160',  sourceW: 600,  sourceH: 320 },
+  { id: '300x250',  label: '300×250',  sourceW: 600,  sourceH: 500 },
+  { id: '600x160',  label: '600×160',  sourceW: 1200, sourceH: 320 },
+  { id: '640x160',  label: '640×160',  sourceW: 1280, sourceH: 320 },
+  { id: '930x180',  label: '930×180',  sourceW: 1860, sourceH: 360 },
+];
+
 /* ── Default element positions (center-point x,y within 600×320 banner) ─── */
 const DEFAULT_POSITIONS = {
   companyName: { x: 300, y: 42  },
@@ -48,10 +57,48 @@ const state = {
   // Persistence
   currentBannerId: null,
   bannerName: '',
+  // Format
+  format: FORMATS[0],
+  previewScale: 1,
 };
 
 /* ── DOM refs ────────────────────────────────────────────────────────────── */
 const $ = (id) => document.getElementById(id);
+
+/* ── Format helpers ──────────────────────────────────────────────────────── */
+function computePreviewScale(fmt) {
+  const main = document.querySelector('.main-content');
+  const availW = (main ? main.clientWidth : window.innerWidth - 320) - 48;
+  return Math.min(1, Math.max(0.1, availW / fmt.sourceW));
+}
+
+function scalePositions(positions, fromW, fromH, toW, toH) {
+  const out = {};
+  for (const k of Object.keys(DEFAULT_POSITIONS)) {
+    const p = positions[k] || DEFAULT_POSITIONS[k];
+    out[k] = { x: Math.round(p.x * toW / fromW), y: Math.round(p.y * toH / fromH) };
+  }
+  return out;
+}
+
+function applyFormat(fmt) {
+  const prev = state.format;
+  state.positions = scalePositions(state.positions, prev.sourceW, prev.sourceH, fmt.sourceW, fmt.sourceH);
+  state.format = fmt;
+  state.previewScale = computePreviewScale(fmt);
+
+  const preview = $('bannerPreview');
+  preview.style.width  = fmt.sourceW + 'px';
+  preview.style.height = fmt.sourceH + 'px';
+  preview.style.transformOrigin = 'top left';
+  preview.style.transform = state.previewScale < 1 ? `scale(${state.previewScale})` : '';
+
+  const outer = preview.parentElement;
+  outer.style.width  = Math.round(fmt.sourceW * state.previewScale) + 'px';
+  outer.style.height = Math.round(fmt.sourceH * state.previewScale) + 'px';
+
+  renderPreview();
+}
 
 /* ── Render ──────────────────────────────────────────────────────────────── */
 function renderPreview() {
@@ -137,8 +184,8 @@ function initDragging() {
 
     drag.active  = true;
     drag.key     = key;
-    drag.offsetX = (e.clientX - rect.left) - pos.x;
-    drag.offsetY = (e.clientY - rect.top)  - pos.y;
+    drag.offsetX = (e.clientX - rect.left) / state.previewScale - pos.x;
+    drag.offsetY = (e.clientY - rect.top)  / state.previewScale - pos.y;
 
     el.classList.add('is-dragging');
     preview.classList.add('is-dragging');
@@ -148,8 +195,8 @@ function initDragging() {
     if (!drag.active) return;
 
     const rect = $('bannerPreview').getBoundingClientRect();
-    const x = clamp((e.clientX - rect.left) - drag.offsetX, 0, 600);
-    const y = clamp((e.clientY - rect.top)  - drag.offsetY, 0, 320);
+    const x = clamp((e.clientX - rect.left) / state.previewScale - drag.offsetX, 0, state.format.sourceW);
+    const y = clamp((e.clientY - rect.top)  / state.previewScale - drag.offsetY, 0, state.format.sourceH);
 
     state.positions[drag.key] = { x, y };
     renderPreview();
@@ -248,6 +295,7 @@ async function handleAnalyze(e) {
   e.preventDefault();
   const websiteUrl = $('websiteUrl').value.trim();
   const facebookUrl = $('facebookUrl').value.trim();
+  const imageUrl = $('imageUrl').value.trim();
 
   setLoading(true);
   clearError();
@@ -280,8 +328,14 @@ async function handleAnalyze(e) {
       selectedImageBase64: null,
       currentBannerId: null,
       bannerName:     analysis.companyName || '',
-      positions:      clonePositions(),
+      positions:      scalePositions(clonePositions(), FORMATS[0].sourceW, FORMATS[0].sourceH, state.format.sourceW, state.format.sourceH),
     });
+
+    // Prepend manually entered image URL so it takes priority
+    if (imageUrl) {
+      state.images.unshift({ url: imageUrl, base64: null });
+      images.unshift(imageUrl);
+    }
 
     populateEditors();
     renderPreview();
@@ -289,7 +343,7 @@ async function handleAnalyze(e) {
 
     $('imagePanel').classList.remove('hidden');
 
-    // Auto-select first image
+    // Auto-select the first image (manual URL takes priority if provided)
     if (images.length > 0) selectImage(images[0]);
   } catch (err) {
     showError(err.message);
@@ -405,21 +459,41 @@ async function handleDownload() {
 
   try {
     const preview = $('bannerPreview');
+    const fmt = state.format;
+    const outer = preview.parentElement;
+
+    // Temporarily remove CSS transform so html2canvas captures at source resolution
+    const savedTransform = preview.style.transform;
+    const savedOuterW = outer.style.width;
+    const savedOuterH = outer.style.height;
+    const savedOuterOverflow = outer.style.overflow;
+    preview.style.transform = '';
+    outer.style.width  = fmt.sourceW + 'px';
+    outer.style.height = fmt.sourceH + 'px';
+    outer.style.overflow = 'visible';
+    await new Promise(r => requestAnimationFrame(r));
+
     const canvas = await html2canvas(preview, {
-      width: 600,
-      height: 320,
-      scale: 2,
+      width: fmt.sourceW,
+      height: fmt.sourceH,
+      scale: 1,
       useCORS: false,
       allowTaint: false,
       logging: false,
       backgroundColor: state.bgColor,
     });
 
+    // Restore visual state
+    preview.style.transform = savedTransform;
+    outer.style.width  = savedOuterW;
+    outer.style.height = savedOuterH;
+    outer.style.overflow = savedOuterOverflow;
+
     const link = document.createElement('a');
     const safeName = (state.bannerName || state.companyName || 'banner')
       .replace(/[^a-z0-9]/gi, '_')
       .toLowerCase();
-    link.download = `banner_${safeName}_${Date.now()}.png`;
+    link.download = `banner_${safeName}_${fmt.id}_${Date.now()}.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
   } catch (err) {
@@ -574,7 +648,7 @@ function resetBanner() {
     images: [],
     currentBannerId: null,
     bannerName: '',
-    positions: clonePositions(),
+    positions: scalePositions(clonePositions(), FORMATS[0].sourceW, FORMATS[0].sourceH, state.format.sourceW, state.format.sourceH),
   });
   populateEditors();
   renderPreview();
@@ -710,8 +784,13 @@ function init() {
   $('downloadBtn').addEventListener('click', handleDownload);
   $('newBannerBtn').addEventListener('click', resetBanner);
   $('resetPositionsBtn').addEventListener('click', () => {
-    state.positions = clonePositions();
+    state.positions = scalePositions(clonePositions(), FORMATS[0].sourceW, FORMATS[0].sourceH, state.format.sourceW, state.format.sourceH);
     renderPreview();
+  });
+
+  // Format selector
+  $('formatSelect').addEventListener('change', (e) => {
+    applyFormat(FORMATS[parseInt(e.target.value, 10)]);
   });
 
   // Drag to reposition
@@ -723,9 +802,11 @@ function init() {
   // Tabs
   initTabs();
 
+  // Apply initial format (sets preview dimensions)
+  applyFormat(FORMATS[0]);
+
   // Initial render
   populateEditors();
-  renderPreview();
 
   // Load saved banners
   loadSavedBanners();
