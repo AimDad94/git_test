@@ -62,8 +62,90 @@ function resolveUrl(base, relative) {
   }
 }
 
+function extractDesignData($) {
+  const design = {
+    themeColor: '',
+    googleFonts: [],
+    cssVars: {},
+    dominantColors: [],
+    bodyFont: '',
+  };
+
+  // Theme color meta tag — often the primary brand colour
+  design.themeColor = $('meta[name="theme-color"]').attr('content') || '';
+
+  // Google Fonts from <link> tags
+  $('link[href*="fonts.googleapis.com"]').each((_, el) => {
+    const href = $(el).attr('href') || '';
+    const families = href.match(/family=([^&]+)/g) || [];
+    families.forEach((f) => {
+      const name = decodeURIComponent(f.replace('family=', '')).split(/[:;]/)[0].replace(/\+/g, ' ').trim();
+      if (name && !design.googleFonts.includes(name)) design.googleFonts.push(name);
+    });
+  });
+
+  const allColors = new Set();
+
+  $('style').each((_, el) => {
+    const css = $(el).text();
+
+    // Google Fonts via @import inside <style>
+    const imports = css.match(/@import[^;]+fonts\.googleapis\.com[^;]+/g) || [];
+    imports.forEach((imp) => {
+      const families = imp.match(/family=([^&'"]+)/g) || [];
+      families.forEach((f) => {
+        const name = decodeURIComponent(f.replace('family=', '')).split(/[:;]/)[0].replace(/\+/g, ' ').trim();
+        if (name && !design.googleFonts.includes(name)) design.googleFonts.push(name);
+      });
+    });
+
+    // CSS custom properties from :root — most reliable source of brand colours
+    const rootBlocks = css.match(/:root\s*\{[^}]+\}/g) || [];
+    rootBlocks.forEach((block) => {
+      for (const m of block.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)) {
+        const val = m[2].trim();
+        if (/#[0-9a-f]{3,8}/i.test(val) || /^rgb|^hsl/i.test(val)) {
+          design.cssVars[m[1]] = val;
+        }
+      }
+    });
+
+    // All 6-digit hex colours in stylesheets
+    (css.match(/#[0-9a-f]{6}\b/gi) || []).forEach((c) => allColors.add(c.toLowerCase()));
+
+    // Font families
+    for (const m of css.matchAll(/font-family\s*:\s*([^;{}]+)/gi)) {
+      const first = m[1].split(',')[0].replace(/['"]/g, '').trim();
+      const skip = /^(inherit|initial|unset|sans-serif|serif|monospace|cursive|fantasy|system-ui|-apple-system)$/i;
+      if (first && !skip.test(first) && !design.bodyFont) design.bodyFont = first;
+    }
+  });
+
+  // Inline style colours
+  $('[style]').each((_, el) => {
+    ($(el).attr('style').match(/#[0-9a-f]{6}\b/gi) || []).forEach((c) => allColors.add(c.toLowerCase()));
+  });
+
+  // Filter out near-white and near-black; keep mid-range brand colours
+  design.dominantColors = [...allColors]
+    .filter((c) => {
+      const r = parseInt(c.slice(1, 3), 16);
+      const g = parseInt(c.slice(3, 5), 16);
+      const b = parseInt(c.slice(5, 7), 16);
+      const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+      return brightness > 25 && brightness < 230;
+    })
+    .slice(0, 20);
+
+  return design;
+}
+
 function extractPageData(html, baseUrl) {
   const $ = cheerio.load(html);
+
+  // Extract design data BEFORE stripping style tags
+  const design = extractDesignData($);
+
   $('script, style, nav, footer, header, [role="navigation"]').remove();
 
   const ogImage = $('meta[property="og:image"]').attr('content');
@@ -88,13 +170,11 @@ function extractPageData(html, baseUrl) {
 
   const images = [];
 
-  // OG image is highest priority
   if (ogImage) {
     const resolved = resolveUrl(baseUrl, ogImage);
     if (resolved) images.push(resolved);
   }
 
-  // Collect <img> sources (skip icons/tiny images)
   $('img').each((_, el) => {
     const src = $(el).attr('src') || $(el).attr('data-src') || $(el).attr('data-lazy-src');
     const w = parseInt($(el).attr('width') || '0', 10);
@@ -105,21 +185,17 @@ function extractPageData(html, baseUrl) {
     if (resolved && !images.includes(resolved)) images.push(resolved);
   });
 
-  const textContent = [
-    ogTitle || title,
-    description,
-    ...headings,
-    ...paragraphs,
-  ]
+  const textContent = [ogTitle || title, description, ...headings, ...paragraphs]
     .join('\n')
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, 3500);
+    .slice(0, 3000);
 
   return {
     textContent,
     images: images.slice(0, 12),
     title: ogTitle || title,
+    design,
   };
 }
 
@@ -147,7 +223,7 @@ app.post('/api/analyze', async (req, res) => {
       return res.status(400).json({ error: `Could not fetch website: ${err.message}` });
     }
 
-    const { textContent, images, title } = extractPageData(html, websiteUrl);
+    const { textContent, images, title, design } = extractPageData(html, websiteUrl);
 
     // Optionally fetch Facebook OG image
     if (facebookUrl && isSafeUrl(facebookUrl)) {
@@ -164,24 +240,50 @@ app.post('/api/analyze', async (req, res) => {
       }
     }
 
-    // Ask Claude to generate banner content
-    const prompt = `You are a professional marketing copywriter. Analyze the following website content and generate professional banner elements.
+    // Build design context string for Claude
+    const cssVarLines = Object.entries(design.cssVars).map(([k, v]) => `  ${k}: ${v}`).join('\n') || '  (none found)';
+    const designContext = `
+=== DESIGN DATA EXTRACTED FROM THE PAGE ===
+Theme-color meta tag: ${design.themeColor || '(not set)'}
+Google Fonts in use:  ${design.googleFonts.length ? design.googleFonts.join(', ') : '(none detected)'}
+Body/primary font:    ${design.bodyFont || '(not detected)'}
+CSS brand colours (mid-range, filtered):
+  ${design.dominantColors.join(', ') || '(none found)'}
+CSS custom properties (colour vars only):
+${cssVarLines}`.trim();
 
-Website URL: ${websiteUrl}
-Content:
+    const prompt = `You are an expert UI/brand designer who creates marketing banners that faithfully match a website's visual identity.
+
+Carefully study the design data extracted directly from the page's CSS. Your colour and font choices MUST be grounded in that data — do not invent colours or fonts that aren't present.
+
+Website: ${websiteUrl}
+
+=== PAGE CONTENT ===
 ${textContent}
 
-Return ONLY a valid JSON object with these exact fields (no markdown, no explanation):
+${designContext}
+
+Rules:
+- primaryColor: the colour for body/headline text on the banner. Use white (#ffffff) if the site uses dark backgrounds, or a dark colour if the site is light.
+- secondaryColor: the site's accent/highlight colour (look for it in CSS vars or dominant colours).
+- overlayColor: a dark colour from the palette to use as the image overlay; if none found use #000000.
+- ctaColor: the site's primary action/button colour extracted from the CSS; fall back to secondaryColor.
+- fontFamily: the EXACT font-family name detected from the page (Google Font name or web-safe font). If none detected, pick a Google Font that matches the brand personality.
+- overlayOpacity: between 0.30 and 0.60 — lower if the site has a clean/minimal feel, higher for dramatic.
+
+Return ONLY a valid JSON object — no markdown, no explanation:
 {
-  "companyName": "the company or brand name",
-  "headline": "bold banner headline, max 6 words, impactful and specific to this company",
-  "subtext": "supporting text describing value proposition, max 15 words",
+  "companyName": "brand name",
+  "headline": "bold banner headline, max 7 words, impactful",
+  "subtext": "value proposition, max 15 words",
   "tagline": "short memorable tagline, max 8 words",
-  "ctaText": "call-to-action button text, 2-4 words",
-  "primaryColor": "suggested text color as hex (e.g. #ffffff for dark backgrounds)",
-  "secondaryColor": "suggested accent/highlight color as hex",
-  "overlayColor": "suggested banner overlay color as hex (usually dark, e.g. #0a0a1a)",
-  "overlayOpacity": suggested overlay opacity as number between 0.35 and 0.65
+  "ctaText": "CTA button text, 2-4 words",
+  "primaryColor": "#hex",
+  "secondaryColor": "#hex",
+  "overlayColor": "#hex",
+  "overlayOpacity": 0.45,
+  "ctaColor": "#hex",
+  "fontFamily": "Font Name"
 }`;
 
     const message = await anthropic.messages.create({
@@ -202,7 +304,6 @@ Return ONLY a valid JSON object with these exact fields (no markdown, no explana
         .trim();
       analysis = JSON.parse(raw);
     } catch {
-      // Graceful fallback
       analysis = {
         companyName: title,
         headline: title.split(/\s+/).slice(0, 5).join(' '),
@@ -210,9 +311,11 @@ Return ONLY a valid JSON object with these exact fields (no markdown, no explana
         tagline: '',
         ctaText: 'Learn More',
         primaryColor: '#ffffff',
-        secondaryColor: '#f0c040',
+        secondaryColor: design.dominantColors[0] || '#f0c040',
         overlayColor: '#000000',
         overlayOpacity: 0.5,
+        ctaColor: design.themeColor || design.dominantColors[0] || '#6c63ff',
+        fontFamily: design.googleFonts[0] || design.bodyFont || '',
       };
     }
 

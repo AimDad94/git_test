@@ -45,6 +45,7 @@ const state = {
   primaryColor: '#ffffff',
   secondaryColor: '#f0c040',
   ctaColor: '#6c63ff',
+  fontFamily: '',
   // Typography
   headlineSize: 32,
   subtextSize: 16,
@@ -64,6 +65,21 @@ const state = {
 
 /* ── DOM refs ────────────────────────────────────────────────────────────── */
 const $ = (id) => document.getElementById(id);
+
+/* ── Font loader ─────────────────────────────────────────────────────────── */
+const SYSTEM_FONTS = new Set(['Arial','Helvetica','Georgia','Times New Roman','Courier New','Verdana','Tahoma','Trebuchet MS','Impact','Comic Sans MS']);
+let _loadedFont = '';
+function loadGoogleFont(family) {
+  if (!family || family === _loadedFont) return;
+  if (SYSTEM_FONTS.has(family)) { _loadedFont = family; return; }
+  document.getElementById('dynamic-font')?.remove();
+  const link = document.createElement('link');
+  link.id = 'dynamic-font';
+  link.rel = 'stylesheet';
+  link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family)}:wght@400;600;700;900&display=swap`;
+  document.head.appendChild(link);
+  _loadedFont = family;
+}
 
 /* ── Format helpers ──────────────────────────────────────────────────────── */
 function computePreviewScale(fmt) {
@@ -104,6 +120,14 @@ function applyFormat(fmt) {
 function renderPreview() {
   const preview = $('bannerPreview');
   const overlay = $('bannerOverlay');
+
+  // Font
+  if (state.fontFamily) {
+    loadGoogleFont(state.fontFamily);
+    preview.style.fontFamily = `'${state.fontFamily}', sans-serif`;
+  } else {
+    preview.style.fontFamily = '';
+  }
 
   // Background
   preview.style.backgroundImage = state.selectedImageBase64
@@ -234,6 +258,7 @@ function syncFromEditors() {
   state.taglineSize   = parseInt($('editTaglineSize').value, 10);
   state.headlineWeight = $('editHeadlineWeight').value;
   state.textAlign     = $('editTextAlign').value;
+  state.fontFamily    = $('editFontFamily').value.trim();
 
   // Update range labels
   $('opacityValue').textContent = Math.round(state.overlayOpacity * 100) + '%';
@@ -280,6 +305,7 @@ function populateEditors() {
   $('editTaglineSize').value   = state.taglineSize;
   $('editHeadlineWeight').value = state.headlineWeight;
   $('editTextAlign').value     = state.textAlign;
+  $('editFontFamily').value    = state.fontFamily || '';
 
   $('opacityValue').textContent      = Math.round(state.overlayOpacity * 100) + '%';
   $('headlineSizeValue').textContent = state.headlineSize + 'px';
@@ -322,7 +348,8 @@ async function handleAnalyze(e) {
       secondaryColor: isHex(analysis.secondaryColor) ? analysis.secondaryColor : '#f0c040',
       overlayColor:   isHex(analysis.overlayColor)   ? analysis.overlayColor   : '#000000',
       overlayOpacity: clamp(parseFloat(analysis.overlayOpacity) || 0.5, 0, 1),
-      ctaColor:       isHex(analysis.secondaryColor) ? analysis.secondaryColor : '#6c63ff',
+      ctaColor:       isHex(analysis.ctaColor)       ? analysis.ctaColor       : (isHex(analysis.secondaryColor) ? analysis.secondaryColor : '#6c63ff'),
+      fontFamily:     analysis.fontFamily || '',
       images:         images.map((url) => ({ url, base64: null })),
       showCta:        true,
       selectedImageBase64: null,
@@ -423,6 +450,7 @@ async function handleSave() {
     taglineSize: state.taglineSize,
     headlineWeight: state.headlineWeight,
     textAlign: state.textAlign,
+    fontFamily: state.fontFamily,
     selectedImageBase64: state.selectedImageBase64,
     imageUrls: state.images.map((i) => i.url),
     positions: state.positions,
@@ -582,6 +610,7 @@ function loadBanner(b) {
     primaryColor:        b.primaryColor   || '#ffffff',
     secondaryColor:      b.secondaryColor || '#f0c040',
     ctaColor:            b.ctaColor       || '#6c63ff',
+    fontFamily:          b.fontFamily     || '',
     overlayColor:        b.overlayColor   || '#000000',
     overlayOpacity:      b.overlayOpacity ?? 0.5,
     bgColor:             b.bgColor        || '#1a1a2e',
@@ -756,7 +785,7 @@ function init() {
   const liveEditors = [
     'editCompanyName', 'editHeadline', 'editSubtext', 'editTagline', 'editCta',
     'editHeadlineSize', 'editSubtextSize', 'editCompanySize', 'editTaglineSize',
-    'editHeadlineWeight', 'editTextAlign', 'editOverlayOpacity',
+    'editHeadlineWeight', 'editTextAlign', 'editOverlayOpacity', 'editFontFamily',
     'editShowCta',
   ];
   liveEditors.forEach((id) => $(id).addEventListener('input', syncFromEditors));
