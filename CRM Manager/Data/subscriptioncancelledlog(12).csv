@@ -1,0 +1,87 @@
+Id,CreatedAt,ModifiedAt,SubscriptionId,SubscriptionEndDate,SubscriptionStartDate,CustomerName,ClientManagerName,CommittedMrr,ChurnReason,ChurnReasonDescription,LastCustomerPortalLoginDate,LifetimeInMonths,AverageMailOpeningRate,HasFacebookPlusConfigWarning,HasFacebookPlusPerformanceWarning,FacebookPlusPerformanceWarningSeverity,HasGroceryPlusConfigWarning,HasGroceryPlusPerformanceWarning,GroceryPlusPerformanceWarningSeverity,HasFacebookConfigWarning,HasFacebookPerformanceWarning,FacebookPerformanceWarningSeverity,HasBannerConfigWarning,HasBannerPerformanceWarning,BannerPerformanceWarningSeverity,HasSeoProfileConfigWarning,HasSeoProfilePerformanceWarning,SeoProfilePerformanceWarningSeverity,HasFacebookAutopilotConfigWarning,HasFacebookAutopilotPerformanceWarning,FacebookAutopilotPerformanceWarningSeverity,HasUndertakerPlusConfigWarning,HasUndertakerPlusPerformanceWarning,UndertakerPlusPerformanceWarningSeverity,HasRealtorPlusConfigWarning,HasRealtorPlusPerformanceWarning,RealtorPlusPerformanceWarningSeverity,HasRealtorPropertyAssessmentConfigWarning,HasRealtorPropertyAssessmentPerformanceWarning,RealtorPropertyAssessmentPerformanceWarningSeverity,HasBusinessArticleConfigWarning,HasBusinessArticlePerformanceWarning,BusinessArticlePerformanceWarningSeverity,HasAutoarticleConfigWarning,HasAutoarticlePerformanceWarning,AutoarticlePerformanceWarningSeverity,HasFacebookImpressionCampaignConfigWarning,HasFacebookImpressionCampaignPerformanceWarning,FacebookImpressionCampaignPerformanceWarningSeverity,HasFacebookClickCampaignConfigWarning,HasFacebookClickCampaignPerformanceWarning,FacebookClickCampaignPerformanceWarningSeverity
+c1c286d6-930f-4bc2-8297-030fb1e2db94,05/28/2025 14:21:21,,66a7900a-822c-4581-bf5f-db0ab9554205,09/21/2025 17:50:00,01/22/2025 18:50:00,Ejendomsmægler Mike Andersen,Thomas Dahl Johansen,1000.0000,Found a better fit with a competitor,"Mike fortæller at selvom at det ikke er mange penge, vil de gerne prøve deres kræfter af nogle andre stedet, på nogle kreative måder. Han fortæller at det ikke er fordi de som sådan er utilfredse med hvad vi har gjort for dem",05/28/2025 10:17:33,7,100,,,,,,,False,False,,False,False,,False,False,,,,,,,,False,True,High,False,True,High,False,True,Low,,,,,,,,,
+a2746593-5b64-4810-9624-03c5c948745e,06/20/2025 08:16:06,,d871f886-648a-4f67-8f20-f6262b7eac55,09/30/2025 17:50:00,08/01/2024 17:50:00,Murer- og Kloakmester Ole B. Johansen ApS,Christoffer Nibe,1495.0000,Manglende udbytte,"Siger at han for nylig er blevet folkepensionist, men stadig har masser af opgaver og arbejder meget. Han ønsker ikke at bruge pengene på det længere, men udtrykte overhovedet ikke nogen utilfredshed. ",01/01/0001 00:00:00,13,71,,,,,,,False,True,High,False,False,,False,False,,,,,,,,,,,,,,False,True,High,,,,,,,,,
+71a0ad9d-74e0-4ab6-8935-08442012a0d5,06/04/2025 09:19:27,,2d2b542b-33e4-4cb6-bb33-48ff8eb24786,09/21/2025 22:00:00,10/22/2023 22:00:00,Rema 1000 Frederikshavn,Christoffer Nibe,1495.0000,Konkurs/ophør,"Pia har solgt sin Rema. Lagt en task til mødebookerne til september 2025 for at vi kan sælge til dem igen. ",01/01/0001 00:00:00,22,80,,,,,,,False,False,,False,True,Medium,False,False,,,,,,,,,,,,,,False,True,High,,,,,,,,,
+8be2ecf0-ef74-4f91-aa7d-0aab7ab007a3,06/11/2025 10:13:50,,b3fe3af3-e5eb-4b36-98b1-1b5962a22026,09/21/2025 17:50:00,01/22/2025 18:50:00,Fri Bikeshop Silkeborg,Thomas Dahl Johansen,1495.0000,Ny marketingchef / Ny retning,En kollega til Jacob ringede og fortalte at de skal ud af det. Hun var ny chef og skulle ikke have noget at gøre med os. Kaldte de to måneder en prøveperiode. Generelt meget pushy for at komme ud. ,01/27/2025 09:32:46,7,67,,,,,,,False,True,High,False,False,,False,False,,,,,,,,,,,,,,False,True,Low,,,,,,,,,
+4a95e879-f599-4c77-b9c4-0f5e18130a48,06/11/2025 09:52:59,,2f4c84cc-6d76-4ae3-9851-b9c0a8db3ba6,09/30/2025 17:50:00,08/01/2024 17:50:00,Sørens Køreskole,Christoffer Nibe,1495.0000,Manglende udbytte,"Kunde synes det var for dyrt. Da jeg gravede siger han så at de mest for noget ud af mund til mund i Brønderslev. Jeg kunne ikke vinde ham på flere byer, og ikke engang nedsat pris. ",01/01/0001 00:00:00,13,0,,,,,,,,,,False,False,,False,False,,,,,,,,,,,,,,False,True,Low,,,,,,,,,
+47a4e4d3-adbb-4071-84ac-1479db95a966,06/11/2025 09:21:01,,74a045bc-2263-4e18-978d-f6525d635529,09/30/2025 17:50:00,12/01/2024 18:50:00,Bilhuset Frederikshavn - Martin Jespersen & Søn A/S,Christoffer Nibe,1495.0000,Manglende udbytte,Martin Vestergaard skal spare der hvor han mener pengene kan bruges bedre. Han mener ikke han får nok ud af aftalen og derfor vil han gerne opsige.,01/01/0001 00:00:00,9,100,,,,,,,False,False,,False,False,,False,False,,,,,,,,,,,,,,False,True,High,,,,,,,,,
+5831ec52-64a5-407e-9f74-1691a1787bbf,06/27/2025 13:08:45,,1fd27977-d26a-4975-bdb1-3be8d5d98ab0,09/29/2025 17:50:00,03/31/2025 17:50:00,home Støvring,Christoffer Nibe,3500.0000,Forventninger,De regnede med at de vil få MANGE flere salgsvurderinger... de har fået 0. Men for satan de har fået god eksponering,03/27/2025 13:09:00,5,17,,,,,,,False,False,,False,False,,False,False,,,,,,,,False,True,Low,False,True,High,False,True,Low,,,,,,,False,False,
+c9da1634-f764-4a89-b901-23b01147f09d,06/02/2025 09:39:02,,de21ca8d-3a43-499c-9c68-0b058c41639c,09/09/2025 17:50:00,10/10/2023 17:50:00,EDC DANEBO,Thomas Dahl Johansen,3000.0000,Ukendt årsag / Kunde svarer ikke,"Kunden tager ikke telefonen i forbindelse med opsigelse. Derfor venter jeg på en årsag. ",01/01/0001 00:00:00,22,62,,,,,,,,,,False,False,,False,False,,False,False,,,,,,,,,,,False,False,,,,,,,,,,
+f9a52adb-d6af-4845-a128-26de0034d11b,05/16/2025 13:06:50,,717978ff-c181-48e9-8073-c5b205d40d9b,09/13/2025 17:50:00,10/14/2024 17:50:00,"Rema 1000 Nørresundby, Vestergade",Christoffer Nibe,1495.0000,Manglende udbytte,"Han opsiger fordi at de ikke får nok ud af det på nuværende tidspunkt. De har ikke ordentlig styr på deres Facebook, da hende som står for den er på barsel. Han sagde at de ikke får styr på den før næste år.
+
+Han tager stort set alt skylden for at det gør, at de ikke får nok ud af samarbejdet. De er godt tilfredse med artiklerne.
+
+Derudover bliver fakturaerne sendt direkte til ham, i stedet for hans bogholderi. Det bør nok ændres i fremtiden.",01/17/2025 13:14:02,10,75,,,,,,,False,True,High,False,False,,False,False,,,,,,,,,,,,,,False,True,Low,,,,,,,,,
+b1119480-5d1e-4dfd-9d63-287efc011648,06/02/2025 10:13:30,,5a8f380e-ae1e-477c-88b0-2b38f66282ae,09/12/2025 22:00:00,10/13/2024 22:00:00,Guldblomsten,Thomas Dahl Johansen,1249.0000,Økonomi,"Anette synes ikke hun får noget ud af det, og synes at det er for dyrt.
+Hvis hun kan få en bedre pris (Måske mere produkt, så vil Anette gerne snakke).",10/14/2024 11:25:49,10,83,,,,,,,False,False,,False,False,,False,False,,,,,,,,,,,,,,False,True,Low,,,,,,,,,
+02a7a3f3-7a03-49a5-91b7-3d6505633d0a,05/14/2025 13:53:23,,8a275fa5-fa7b-4266-a463-7c01f0eea6d1,09/11/2025 17:50:00,11/12/2024 18:50:00,Mejrup Kultur- og Fritidscenter,Thomas Dahl Johansen,1495.0000,Økonomi,"Kenneth opsiger sit abonnement grundet sparetider. De kigger også alle deres andre abonnementer igennem, og beholder kun det der er gratis, altså deres Facebook. Derudover var der også en smule i. det output de fik. Men det væsenligste grundlag var økonomi og sparetider.",01/16/2025 11:05:54,9,0,,,,,,,False,True,Low,False,True,Low,False,False,,,,,,,,,,,,,,False,True,Low,,,,,,,,,
+e53fe5cd-a795-487d-a221-405bd7bb91ad,05/15/2025 14:26:35,,ee58c5dc-7cbd-4db3-b493-358c1da282a6,09/02/2025 22:00:00,12/03/2023 23:00:00,Cafe Rohde,Birk Henriksen,2494.0000,Manglende udbytte,"Cecilie ringede ind fordi, hun ønskede at opsige.
+
+Hun sagde, at det var fordi, at det var for dyrt ift., hvor meget de brugte og hvor meget de hørte fra folk, at de kendte os. Så blev det for dyrt, hvis folk ikke kender os. Hun snakkede især om antal følgere på vores FB, som er langt lavere end deres, samt at de gav 3.000 i måneden, hvilket hun følte var dyrt, når de ikke fik brugt det med artikler osv. nok.
+
+Derudover, så følte hun ikke rigtig siden havde taget fart, som hun var blevet ""lovet"". Aabybro.
+
+Jeg lovede hende, at vi lige sender en bekræftelse på, at hun har opsagt, hvilket jeg ikke har gjort.
+
+Hun var ikke sur eller noget, og kan nok godt overbevises, hvis man har nogle tal på, hvad hun får ud af det og evt. nogen tal på, hvor mange der faktisk følger indholdet (Nyhedsbrev eller besøgende), mener vi har mange på nyhedsbrevet?
+
+Tror ikke, at hun ved, at vi laver FB-opslag for hende på vores side. Hun laver nemlig ikke selv FB-opslag.",01/01/0001 00:00:00,20,18,,,,,,,,,,False,False,,False,False,,False,False,,,,,,,,,,,False,False,,,,,,,,,,
+b7937e30-3f30-45d1-8da0-5d454d223ec4,05/23/2025 13:21:51,,f22fe1c6-db8f-4f4f-980f-dddbed4a56fb,09/16/2025 17:50:00,01/17/2024 18:50:00,GARTNERIET KORSHØJ,Jonas Andersen,1500.0000,Manglende forbrug hos kunde,"Jeg vil gerne opsige vores abonnement, fra d 17-06-2025, da vi ikke får det brugt, så jeg føler at vi betaler for noget, vi ikke rigtig får ret meget ud af. 
+
+Det er helt sikkert mig, der ikke har interesse for at sidde ved en pc, og lave noget der.
+
+Så jeg vil takke for det I har gjort for Korshøj gartneri.
+
+Mvh
+
+Birthe Rolle.",01/01/0001 00:00:00,19,10,,,,,,,False,True,Medium,False,False,,False,False,,False,False,,,,,,,,,,,False,True,High,,,,,,,,,
+d71930ff-e7b9-4326-baf9-6d6824b9f21f,06/04/2025 09:04:20,,a63d1afc-b818-4456-979d-7e8274d787ed,09/28/2025 17:50:00,01/29/2025 18:50:00,VENNELYST BAGERI,Thomas Dahl Johansen,1495.0000,Manglende forbrug hos kunde,"Jeg får det ikke gjort, føler ikke at jeg han har lagt arbejdet i det.
+Kent går ind i en periode, hvor han i hvert fald slet ikke har tiden til lave artikler og tage stilling til dem.",02/11/2025 09:40:40,7,25,,,,,,,False,True,Low,False,False,,False,False,,,,,,,,,,,,,,False,True,High,,,,,,,,,
+056c04f9-ee76-43e2-a75b-70ccb37a0b08,05/12/2025 11:13:45,,467587da-bdf7-4d14-8ad0-be31eb320007,09/05/2025 17:50:00,12/06/2023 18:50:00,Lind Tagdækning,Anders Hovendahl,1495.0000,Manglende udbytte,"Jeg har ikke fået nogen henvendelser.
+
+Tror ikke det har ret stor virkning
+
+Får flest henvendelser fra Tømrermestre eller mund til mund.
+
+Er faktisk glad for indholdet.",11/06/2024 15:23:34,20,60,,,,,,,False,False,,False,False,,False,False,,,,,,,,,,,,,,False,False,,,,,,,,,,
+a0031854-eefc-4e90-aaae-7c04b750da59,06/02/2025 14:14:54,,c21e5ff5-9654-4b4b-bcaf-befc95c96be3,09/09/2025 17:50:00,01/10/2025 18:50:00,"Galleri Soli ",Mattias Løwe,998.0000,Konkurs/ophør,Er ved at lukke virksomheden stille og roligt lidt ned og har fået noget sygdom her og der. Kan godt lide produktet og har egentlig intet imod det. Han mener bare ikke at de får brugt det til dets potentiale.,01/14/2025 10:37:20,7,80,,,,,,,False,True,High,False,False,,False,False,,,,,,,,,,,,,,False,True,Low,,,,,,,,,
+d106769a-df3c-4f0a-b2ea-893d4ae4d739,06/11/2025 10:26:07,,be0c9805-59d4-4c9b-8414-07e628ec5dcb,09/21/2025 18:50:00,12/22/2022 18:50:00,Westergaard Bolig,Christoffer Nibe,3500.0000,Found a better fit with a competitor,"Kunden mener at de kan skaffe en bedre CPC og visningspris på Meta selv med de 3500. Han er lydhør overfor nye koncepter, men stopper for nu.",02/21/2025 10:06:03,32,60,,,,,,,False,False,,False,False,,False,False,,,,,,,,False,False,,,,,False,True,Medium,,,,,,,False,False,
+2f5951af-cd13-42c8-a50a-9e02102b1fd0,06/05/2025 10:55:13,,acc18408-cc9f-4f8c-ab76-858d77492d73,09/29/2025 17:50:00,09/30/2024 17:50:00,Maler Hanne,Mattias Løwe,299.0000,Manglende udbytte,"Jeg vil gerne opsige mit abonnement ved jer. Jeg har endnu ikke fået kunder den vej igennem og vil derfor gerne holde en pause, måske i fremtiden kan vi prøve igen mvh Maler Hanne v/Hanne Sørensen ",10/11/2024 12:21:49,11,79,,,,,,,,,,False,False,,False,False,,,,,,,,,,,,,,False,True,High,,,,,,,,,
+5a2fb9c3-f298-4b98-b2e3-b69f92effcb0,06/02/2025 14:54:27,,eb9ee79b-8bc6-4f9a-a9b8-e1ef6d0edacc,09/10/2025 17:50:00,03/11/2025 18:50:00,Butik Mille,Mattias Løwe,998.0000,Manglende forbrug hos kunde,"FÅR IKKE BRUGT DET, da (selvom det er mening at man ikke skal bruge særlig meget tid), føler hun stadig at det er for meget for hende dsv. Hun sagde også hun brugte meget tid på rettetid
+
+Havde dsv svært ved at koordinere en 10min samtale med Josefine eller Nanna, ikke pga dem, men hende selv.
+
+Syntes alligevel det er et meget fint concept
+
+Kunne godt vende tilbage
+
+Vil gerne lave hjemmeside (derfor sparer penge)
+
+",03/11/2025 10:05:08,5,33,,,,,,,False,True,Medium,False,False,,False,False,,,,,,,,,,,,,,False,True,Low,,,,,,,,,
+2bbd54ff-be1d-408b-b9f5-c166ce5261d9,05/12/2025 13:12:01,,7bcd616a-e556-4a3d-9425-a1816e37ebe0,09/02/2025 17:50:00,12/03/2024 18:50:00,Skousen Holstebro,Thomas Dahl Johansen,1495.0000,Ukendt årsag / Kunde svarer ikke,Kim var hemmelighedsfuld og ville ikke svare på hvorfor de opsagde under opkaldet. Ringede ind.,12/09/2024 09:37:58,8,14,,,,,,,False,False,,False,False,,False,False,,,,,,,,,,,,,,False,True,High,,,,,,,,,
+dd7d4725-c974-4ce8-a248-c7112959f5e1,06/02/2025 09:55:50,,a9d0f520-87ad-41da-9bf8-6d6363b117bb,09/01/2025 17:50:00,09/02/2024 17:50:00,THUSGAARD LIVING,Thomas Dahl Johansen,1249.0000,Found a better fit with a competitor,"
+
+Hej Thomas,
+
+Vi ønsker at opsige vores aftale, pr. dags dato.
+
+Det er ikke fordi vi overhovedet har været utilfredse.
+
+Men vi ønsker at bruge vores annoncepenge anderledes.
+
+God weekend til dig. ",02/11/2025 12:01:24,11,12,False,True,High,,,,False,True,Medium,False,False,,False,False,,,,,,,,,,,,,,False,True,Low,,,,,,,,,
+f3f16d75-5d56-4ce6-9d39-cbdeb16bc709,05/27/2025 13:30:07,,36ac61bb-b66c-4ac9-8fad-0d3dc2805268,09/25/2025 17:50:00,03/26/2025 18:50:00,Restaurant Sæson,Christoffer Nibe,1695.0000,Manglende forbrug hos kunde,"Statusmøde kald der desværre endte i en opsigelse.
+Mia får ikke platformen brugt, og mener i øvrigt at de har nok kunder lige nu.
+De opsiger for at være sikre på at de kan komme ud til sommer, men er ikke blege for at snakkes ved igen senere på sommeren. ",04/03/2025 13:30:24,5,60,,,,,,,False,False,,False,False,,False,False,,,,,,,,,,,,,,False,False,,,,,,,,,,
+308b3db2-19e8-4c73-ba93-d39da6e914d0,06/05/2025 09:39:35,,bc6d6efc-8437-40c8-8742-a75767a7ea3f,09/25/2025 17:50:00,03/26/2025 18:50:00,Jane's Mad og Kaffebar,Mattias Løwe,998.0000,Konkurs/ophør,"Jane lukker butikken da hendes bror er død af kræft, og ved ikke om hun åbner den igen. ",06/04/2025 06:57:42,5,40,,,,,,,False,False,,False,False,,False,False,,,,,,,,,,,,,,False,False,,,,,,,,,,
+0fe34a2f-684e-42f3-92df-d831f675d71f,06/05/2025 09:20:11,,fbf7b09e-635e-4fb7-9d8c-dd4c5293548b,09/05/2025 17:50:00,02/06/2025 18:50:00,RealMæglerne Aabenraa & Tønder,Thomas Dahl Johansen,1995.0000,Ny marketingchef / Ny retning,"Pernille som er kontaktperson er ikke ved Realmæglerne mere, noget som de ikke har informeret os om. Derfor vil den nye kontaktperson opsige os. ",02/06/2025 10:11:39,6,50,,,,,,,False,False,,False,False,,False,False,,,,,,,,False,False,,False,False,,False,False,,,,,,,,,,
+1574463f-734b-4514-847c-e99e2e5bf6b2,05/14/2025 13:43:37,,3b2ccc2f-355f-4763-8e5b-2c528485c21f,09/10/2025 17:50:00,03/11/2024 18:50:00,Benjas Barbershop v/ Benjamin Gashi,Jonas Andersen,499.0000,Økonomi,Benjamin opsiger fordi at han har for mange udgifter og for mange steder han betaler til. Det var ikke fordi at han var utilfreds,02/11/2025 12:07:13,17,88,,,,,,,,,,False,False,,False,False,,,,,,,,,,,,,,False,True,Medium,,,,,,,,,
+f649062b-dec8-40ac-b4d2-f0a5164b58a1,05/23/2025 13:16:47,,d37c4a01-5651-471c-b921-1a53f744226f,09/02/2025 17:50:00,03/03/2025 18:50:00,MH Service,Christoffer Nibe,1495.0000,Manglende udbytte,"Mikkel føler ikke, at han får værdi ud af abonnementet.",03/07/2025 11:45:33,5,88,,,,,,,False,True,High,False,False,,False,False,,,,,,,,,,,,,,False,True,Low,,,,,,,,,
+ac60d9cf-3d0b-41db-9445-f4d4fe27fdd3,05/23/2025 09:21:57,,6e2e2209-3a1b-4d7a-8433-56194af4d409,09/18/2025 17:50:00,03/19/2025 18:50:00,Ung I Balance,Christoffer Nibe,1695.0000,Økonomi," Hej Vores digital.
+
+Jeg vælger hermed at opsige min aftale med vores digital. 
+
+Jeg har været meget glad for jeres gode kundeservice, men jeg tror simpelthen ikke på at jeg får nok ud af de penge jeg giver for aftalen. 
+Jeg har endnu ikke fået nogen henvendelser baseret på den markedsføring der har været gennem Vores digital, hvilket jeg godt ved er helt normalt, men jeg har simpelthen ikke råd til at betale for det. ",03/19/2025 09:06:02,5,60,,,,,,,False,False,,False,False,,False,False,,,,,,,,,,,,,,False,False,,,,,,,,,,
+d6ab3671-5963-4a08-8b11-fdd8f5ba5e5d,05/26/2025 13:36:28,,75973199-5cf7-41b3-b092-24f60abfc3d3,09/21/2025 17:50:00,07/22/2024 17:50:00,Louis Nielsen Korsør ApS,Mattias Løwe,1995.0000,Found a better fit with a competitor,"Ole fortæller at flere af de louis nielsener i området har aftatl at gå sammen til noget biograf reklame, og derfor vil han gerne stoppe hos os.
+Han fortæller yderligere at i vores nyhedsbreve så er der altid en optiker, som ender højere oppe end hans Louis Nielsen, og at det er super ærgeligt.",03/20/2025 09:35:02,13,100,,,,,,,,,,False,False,,False,False,,,,,,,,,,,,,,False,True,Medium,,,,,,,,,
