@@ -88,6 +88,39 @@
   .bar-fill { height: 100%; background: var(--accent); border-radius: 4px; }
   .bar-val { font-variant-numeric: tabular-nums; text-align: right; color: var(--text); }
 
+  thead th.sortable { cursor: pointer; user-select: none; }
+  thead th.sortable:hover { color: var(--text); background: #f3f4f6; }
+  thead th .arrow { display: inline-block; width: 10px; margin-left: 4px; opacity: 0.35;
+    font-size: 10px; transition: opacity 0.15s; }
+  thead th.active .arrow { opacity: 1; color: var(--accent); }
+
+  .info { display: inline-block; width: 14px; height: 14px; border-radius: 50%;
+    background: #d1d5db; color: #fff; font-size: 10px; font-weight: 700; text-align: center;
+    line-height: 14px; cursor: help; margin-left: 4px; position: relative; vertical-align: middle;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  .info:hover { background: var(--accent); }
+  .info::before { content: '?'; }
+  .info:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #111827; color: #fff;
+    font-size: 12px; font-weight: 400;
+    padding: 8px 10px; border-radius: 6px;
+    width: max-content; max-width: 280px;
+    text-align: left; line-height: 1.45;
+    letter-spacing: normal; text-transform: none;
+    z-index: 10; pointer-events: none;
+    white-space: normal;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+  }
+  .info:hover::before { content: '?'; }
+  .info.info-below:hover::after {
+    bottom: auto; top: calc(100% + 8px);
+  }
+
   .state { padding: 40px; text-align: center; color: var(--muted); }
   .state.error { color: var(--danger); }
 </style>
@@ -95,7 +128,7 @@
 <body>
 <header>
   <h1>CRM Manager — Contact Priority</h1>
-  <p>Active customers ranked by a weighted score across call recency, satisfaction, MRR, invoices, products, and binding. Click a row for the breakdown.</p>
+  <p>Active customers ranked by contact priority, with a separate churn-risk score from activity trends, call staleness, satisfaction, invoices and renewal proximity. Click a row for the breakdown.</p>
 </header>
 <main>
   <div class="toolbar">
@@ -106,27 +139,28 @@
   <div class="card">
     <table>
       <thead>
-        <tr>
+        <tr id="thead-row">
           <th class="rank">#</th>
-          <th>Score</th>
-          <th>Customer</th>
-          <th>Last called</th>
-          <th>Sat.</th>
-          <th>MRR</th>
-          <th>Invoice</th>
-          <th>Products</th>
-          <th>Binding</th>
+          <th class="sortable" data-sort="score">Score<span class="info info-below" data-tip="Who to call first. A blend of how long since we last spoke, how happy they are, how much they pay, and a few other signals. Click a row to see the full breakdown."></span><span class="arrow"></span></th>
+          <th class="sortable" data-sort="risk">Risk<span class="info info-below" data-tip="How likely the customer is to leave us, based on how their activity is trending and how close their subscription is to ending. Click a row to see what is driving it."></span><span class="arrow"></span></th>
+          <th class="sortable" data-sort="name">Customer<span class="arrow"></span></th>
+          <th class="sortable" data-sort="lastCall">Last called<span class="arrow"></span></th>
+          <th class="sortable" data-sort="satisfaction">Sat.<span class="arrow"></span></th>
+          <th class="sortable" data-sort="mrr">MRR<span class="arrow"></span></th>
+          <th class="sortable" data-sort="invoice">Invoice<span class="arrow"></span></th>
+          <th class="sortable" data-sort="products">Products<span class="arrow"></span></th>
+          <th class="sortable" data-sort="binding">Binding<span class="arrow"></span></th>
         </tr>
       </thead>
       <tbody id="tbody">
-        <tr><td colspan="9" class="state">Loading…</td></tr>
+        <tr><td colspan="10" class="state">Loading…</td></tr>
       </tbody>
     </table>
   </div>
 </main>
 <script>
   const MAX_SCORE = 100;
-  const WEIGHTS = { call: 40, satisfaction: 20, mrr: 15, invoice: 10, products: 8, binding: 7 };
+  const WEIGHTS = { call: 35, satisfaction: 20, mrr: 10, invoice: 10, products: 18, binding: 7 };
   const SIGNAL_LABELS = {
     call: 'Last called',
     satisfaction: 'Satisfaction',
@@ -135,6 +169,27 @@
     products: 'Products (inverse)',
     binding: 'Binding (inverse)'
   };
+  const RISK_WEIGHTS = { activityDecline: 50, recentZero: 30, renewal: 20 };
+  const RISK_LABELS = {
+    activityDecline: 'Activity decline',
+    recentZero: 'Recent zero-activity',
+    renewal: 'Renewal approaching'
+  };
+
+  const SIGNAL_TIPS = {
+    call: 'How long since we last called this customer. The longer the gap, the higher the score.',
+    satisfaction: 'The satisfaction traffic light. Red raises the score the most, Green keeps it low.',
+    mrr: 'How much the customer pays us each month. Higher payers rank higher.',
+    invoice: 'Whether the customer has any unpaid invoices right now.',
+    products: 'Customers with fewer products take less effort to help, so they rank higher.',
+    binding: 'Customers not locked into a binding period are easier to lose, so they rank higher.'
+  };
+
+  const RISK_TIPS = {
+    activityDecline: 'The customer\'s activity over the last 3 months compared to the 3 months before. A big drop means their products are losing steam.',
+    recentZero: 'Zero clicks, impressions and article reads in the most recent month — or the last two. The clearest sign a product has gone dead.',
+    renewal: 'How close the subscription is to ending, and whether they are still locked into a binding period. Sooner means higher risk, unless they can\'t leave yet.'
+  };
 
   const tbody = document.getElementById('tbody');
   const stats = document.getElementById('stats');
@@ -142,6 +197,54 @@
   const refreshBtn = document.getElementById('refresh');
 
   let all = [];
+  let sortState = { key: 'score', dir: 'desc' };
+
+  const SAT_RANK = { Red: 3, Yellow: 2, null: 1, Green: 0 };
+
+  const SORT_EXTRACTORS = {
+    score:        c => c.priority.total,
+    risk:         c => c.churnRisk ? c.churnRisk.total : 0,
+    name:         c => (c.customerName || '').toLowerCase(),
+    lastCall:     c => c.lastCallDate ? new Date(c.lastCallDate).getTime() : -Infinity,
+    satisfaction: c => SAT_RANK[c.satisfactionScore === null ? 'null' : c.satisfactionScore] ?? 1,
+    mrr:          c => c.mrr || 0,
+    invoice:      c => c.invoiceStatus === 'has_unpaid' ? 1 : 0,
+    products:     c => (c.products || []).length,
+    binding:      c => {
+      const end = c.bindingPeriod && c.bindingPeriod.end;
+      return end && new Date(end).getTime() > Date.now() ? 1 : 0;
+    }
+  };
+
+  const DEFAULT_DIR = {
+    score: 'desc', risk: 'desc', name: 'asc', lastCall: 'asc', satisfaction: 'desc',
+    mrr: 'desc', invoice: 'desc', products: 'asc', binding: 'asc'
+  };
+
+  function sortItems(items) {
+    const extract = SORT_EXTRACTORS[sortState.key];
+    const mul = sortState.dir === 'asc' ? 1 : -1;
+    return [...items].sort((a, b) => {
+      const av = extract(a);
+      const bv = extract(b);
+      if (typeof av === 'string') return av.localeCompare(bv) * mul;
+      return (av - bv) * mul;
+    });
+  }
+
+  function updateSortIndicators() {
+    document.querySelectorAll('thead th.sortable').forEach(th => {
+      const key = th.dataset.sort;
+      const arrow = th.querySelector('.arrow');
+      if (key === sortState.key) {
+        th.classList.add('active');
+        arrow.textContent = sortState.dir === 'asc' ? '▲' : '▼';
+      } else {
+        th.classList.remove('active');
+        arrow.textContent = '▼';
+      }
+    });
+  }
 
   const fmtMRR = v => v == null ? '—' :
     new Intl.NumberFormat('da-DK', { style: 'currency', currency: 'DKK', maximumFractionDigits: 0 }).format(v);
@@ -185,26 +288,44 @@
     return 'score-lo';
   }
 
+  function riskClass(total) {
+    if (total >= 50) return 'score-hi';
+    if (total >= 25) return 'score-md';
+    return 'score-lo';
+  }
+
   function escape(s) {
     return String(s ?? '').replace(/[&<>"']/g, c =>
       ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
-  function breakdownRow(p) {
-    const rows = Object.entries(p.breakdown).map(([k, v]) => {
-      const max = WEIGHTS[k];
-      const pct = (v / max) * 100;
+  function barsHtml(breakdown, weights, labels, tips) {
+    return Object.entries(breakdown).map(([k, v]) => {
+      const max = weights[k];
+      const pct = max ? (v / max) * 100 : 0;
+      const tip = tips && tips[k]
+        ? `<span class="info" data-tip="${escape(tips[k])}"></span>`
+        : '';
       return `
-        <div class="bar-label">${SIGNAL_LABELS[k]}</div>
+        <div class="bar-label">${labels[k]}${tip}</div>
         <div class="bar-track"><div class="bar-fill" style="width:${pct.toFixed(0)}%"></div></div>
         <div class="bar-val">${v.toFixed(1)} / ${max}</div>
       `;
     }).join('');
+  }
+
+  function breakdownRow(c) {
+    const pBars = barsHtml(c.priority.breakdown, WEIGHTS, SIGNAL_LABELS, SIGNAL_TIPS);
+    const rBars = c.churnRisk ? barsHtml(c.churnRisk.breakdown, RISK_WEIGHTS, RISK_LABELS, RISK_TIPS) : '';
     return `
-      <tr class="breakdown-row"><td colspan="9">
+      <tr class="breakdown-row"><td colspan="10">
         <div class="breakdown">
-          <h4>Priority breakdown — total ${p.total.toFixed(1)} / ${MAX_SCORE}</h4>
-          <div class="bars">${rows}</div>
+          <h4>Priority breakdown — total ${c.priority.total.toFixed(1)} / ${MAX_SCORE}</h4>
+          <div class="bars">${pBars}</div>
+          ${c.churnRisk ? `
+            <h4 style="margin-top:16px;">Churn risk breakdown — total ${c.churnRisk.total.toFixed(1)} / ${MAX_SCORE}</h4>
+            <div class="bars">${rBars}</div>
+          ` : ''}
         </div>
       </td></tr>
     `;
@@ -212,13 +333,16 @@
 
   function render(items) {
     if (!items.length) {
-      tbody.innerHTML = '<tr><td colspan="9" class="state">No customers match.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="10" class="state">No customers match.</td></tr>';
       return;
     }
-    tbody.innerHTML = items.map((c, i) => `
+    tbody.innerHTML = items.map((c, i) => {
+      const risk = c.churnRisk ? c.churnRisk.total : 0;
+      return `
       <tr data-idx="${i}">
         <td class="rank">${i + 1}</td>
         <td><span class="score ${scoreClass(c.priority.total)}">${c.priority.total.toFixed(0)}</span></td>
+        <td><span class="score ${riskClass(risk)}">${risk.toFixed(0)}</span></td>
         <td class="name">${escape(c.customerName)}</td>
         <td>${lastCallCell(c.lastCallDate)}</td>
         <td>${satisfactionCell(c.satisfactionScore)}</td>
@@ -227,7 +351,8 @@
         <td class="muted">${(c.products || []).length}</td>
         <td>${bindingCell(c.bindingPeriod)}</td>
       </tr>
-    `).join('');
+    `;
+    }).join('');
 
     tbody.querySelectorAll('tr[data-idx]').forEach(tr => {
       tr.addEventListener('click', () => {
@@ -243,19 +368,19 @@
           r.remove();
         });
         tr.classList.add('expanded');
-        tr.insertAdjacentHTML('afterend', breakdownRow(items[idx].priority));
+        tr.insertAdjacentHTML('afterend', breakdownRow(items[idx]));
       });
     });
   }
 
   function applyFilter() {
     const q = search.value.trim().toLowerCase();
-    if (!q) return render(all);
-    const filtered = all.filter(c =>
-      (c.customerName || '').toLowerCase().includes(q) ||
-      (c.sites || []).some(s => s.toLowerCase().includes(q))
-    );
-    render(filtered);
+    const base = q
+      ? all.filter(c =>
+          (c.customerName || '').toLowerCase().includes(q) ||
+          (c.sites || []).some(s => s.toLowerCase().includes(q)))
+      : all;
+    render(sortItems(base));
   }
 
   async function load() {
@@ -269,15 +394,32 @@
       const never = all.filter(c => !c.lastCallDate).length;
       const red = all.filter(c => c.satisfactionScore === 'Red').length;
       const unpaid = all.filter(c => c.invoiceStatus === 'has_unpaid').length;
-      stats.textContent = `${data.total} customers · ${never} never called · ${red} red · ${unpaid} unpaid`;
+      const highRisk = all.filter(c => c.churnRisk && c.churnRisk.total >= 50).length;
+      stats.textContent = `${data.total} customers · ${never} never called · ${red} red · ${unpaid} unpaid · ${highRisk} high risk`;
       applyFilter();
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="9" class="state error">Failed to load: ${escape(err.message)}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="10" class="state error">Failed to load: ${escape(err.message)}</td></tr>`;
     }
   }
 
   search.addEventListener('input', applyFilter);
   refreshBtn.addEventListener('click', load);
+
+  document.querySelectorAll('thead th.sortable').forEach(th => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.sort;
+      if (sortState.key === key) {
+        sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        sortState.key = key;
+        sortState.dir = DEFAULT_DIR[key];
+      }
+      updateSortIndicators();
+      applyFilter();
+    });
+  });
+
+  updateSortIndicators();
   load();
 </script>
 </body>
