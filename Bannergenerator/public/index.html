@@ -178,6 +178,44 @@
                 <input type="text" id="editBgColorHex" class="hex-input" value="#1a1a2e" maxlength="7">
               </div>
             </div>
+
+            <!-- CTA Button formatting -->
+            <div class="field span-3 section-divider">
+              <span class="section-label">CTA Button Style</span>
+            </div>
+            <div class="field">
+              <label>Text Color</label>
+              <div class="color-row">
+                <input type="color" id="editCtaTextColor" value="#ffffff">
+                <input type="text" id="editCtaTextColorHex" class="hex-input" value="#ffffff" maxlength="7">
+              </div>
+            </div>
+            <div class="field">
+              <label>Font Size — <span id="ctaFontSizeValue">14px</span></label>
+              <input type="range" id="editCtaFontSize" min="10" max="36" value="14" class="range-input">
+            </div>
+            <div class="field">
+              <label>Border Radius — <span id="ctaRadiusValue">4px</span></label>
+              <input type="range" id="editCtaBorderRadius" min="0" max="50" value="4" class="range-input">
+            </div>
+            <div class="field">
+              <label>Padding Vertical — <span id="ctaPaddingVValue">10px</span></label>
+              <input type="range" id="editCtaPaddingV" min="4" max="28" value="10" class="range-input">
+            </div>
+            <div class="field">
+              <label>Padding Horizontal — <span id="ctaPaddingHValue">28px</span></label>
+              <input type="range" id="editCtaPaddingH" min="8" max="80" value="28" class="range-input">
+            </div>
+            <div class="field">
+              <label>Font Weight</label>
+              <select id="editCtaFontWeight" class="select-input">
+                <option value="400">Regular</option>
+                <option value="600">Semi Bold</option>
+                <option value="700" selected>Bold</option>
+                <option value="800">Extra Bold</option>
+                <option value="900">Black</option>
+              </select>
+            </div>
           </div>
         </div>
 

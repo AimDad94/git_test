@@ -45,6 +45,12 @@ const state = {
   primaryColor: '#ffffff',
   secondaryColor: '#f0c040',
   ctaColor: '#6c63ff',
+  ctaTextColor: '#ffffff',
+  ctaFontSize: 14,
+  ctaBorderRadius: 4,
+  ctaPaddingV: 10,
+  ctaPaddingH: 28,
+  ctaFontWeight: '700',
   fontFamily: '',
   // Typography
   headlineSize: 32,
@@ -175,7 +181,11 @@ function renderPreview() {
   const cta = $('previewCta');
   cta.textContent = state.ctaText;
   cta.style.backgroundColor = state.ctaColor;
-  cta.style.color = state.primaryColor;
+  cta.style.color = state.ctaTextColor;
+  cta.style.fontSize = state.ctaFontSize + 'px';
+  cta.style.fontWeight = state.ctaFontWeight;
+  cta.style.borderRadius = state.ctaBorderRadius + 'px';
+  cta.style.padding = `${state.ctaPaddingV}px ${state.ctaPaddingH}px`;
   cta.style.left = pos.cta.x + 'px';
   cta.style.top  = pos.cta.y + 'px';
   cta.style.display = state.showCta ? '' : 'none';
@@ -252,6 +262,13 @@ function syncFromEditors() {
   state.overlayOpacity = parseFloat($('editOverlayOpacity').value);
   state.bgColor       = $('editBgColor').value;
 
+  state.ctaTextColor    = $('editCtaTextColor').value;
+  state.ctaFontSize     = parseInt($('editCtaFontSize').value, 10);
+  state.ctaBorderRadius = parseInt($('editCtaBorderRadius').value, 10);
+  state.ctaPaddingV     = parseInt($('editCtaPaddingV').value, 10);
+  state.ctaPaddingH     = parseInt($('editCtaPaddingH').value, 10);
+  state.ctaFontWeight   = $('editCtaFontWeight').value;
+
   state.headlineSize  = parseInt($('editHeadlineSize').value, 10);
   state.subtextSize   = parseInt($('editSubtextSize').value, 10);
   state.companySize   = parseInt($('editCompanySize').value, 10);
@@ -261,18 +278,23 @@ function syncFromEditors() {
   state.fontFamily    = $('editFontFamily').value.trim();
 
   // Update range labels
-  $('opacityValue').textContent = Math.round(state.overlayOpacity * 100) + '%';
-  $('headlineSizeValue').textContent = state.headlineSize + 'px';
-  $('subtextSizeValue').textContent = state.subtextSize + 'px';
-  $('companySizeValue').textContent = state.companySize + 'px';
-  $('taglineSizeValue').textContent = state.taglineSize + 'px';
+  $('opacityValue').textContent       = Math.round(state.overlayOpacity * 100) + '%';
+  $('headlineSizeValue').textContent  = state.headlineSize + 'px';
+  $('subtextSizeValue').textContent   = state.subtextSize + 'px';
+  $('companySizeValue').textContent   = state.companySize + 'px';
+  $('taglineSizeValue').textContent   = state.taglineSize + 'px';
+  $('ctaFontSizeValue').textContent   = state.ctaFontSize + 'px';
+  $('ctaRadiusValue').textContent     = state.ctaBorderRadius + 'px';
+  $('ctaPaddingVValue').textContent   = state.ctaPaddingV + 'px';
+  $('ctaPaddingHValue').textContent   = state.ctaPaddingH + 'px';
 
   // Sync hex inputs with color pickers
-  $('editPrimaryColorHex').value   = state.primaryColor;
-  $('editSecondaryColorHex').value = state.secondaryColor;
-  $('editCtaColorHex').value       = state.ctaColor;
-  $('editOverlayColorHex').value   = state.overlayColor;
-  $('editBgColorHex').value        = state.bgColor;
+  $('editPrimaryColorHex').value    = state.primaryColor;
+  $('editSecondaryColorHex').value  = state.secondaryColor;
+  $('editCtaColorHex').value        = state.ctaColor;
+  $('editOverlayColorHex').value    = state.overlayColor;
+  $('editBgColorHex').value         = state.bgColor;
+  $('editCtaTextColorHex').value    = state.ctaTextColor;
 
   renderPreview();
 }
@@ -299,6 +321,14 @@ function populateEditors() {
   $('editOverlayColorHex').value   = state.overlayColor;
   $('editBgColorHex').value        = state.bgColor;
 
+  $('editCtaTextColor').value       = state.ctaTextColor;
+  $('editCtaTextColorHex').value    = state.ctaTextColor;
+  $('editCtaFontSize').value        = state.ctaFontSize;
+  $('editCtaBorderRadius').value    = state.ctaBorderRadius;
+  $('editCtaPaddingV').value        = state.ctaPaddingV;
+  $('editCtaPaddingH').value        = state.ctaPaddingH;
+  $('editCtaFontWeight').value      = state.ctaFontWeight;
+
   $('editHeadlineSize').value  = state.headlineSize;
   $('editSubtextSize').value   = state.subtextSize;
   $('editCompanySize').value   = state.companySize;
@@ -312,6 +342,10 @@ function populateEditors() {
   $('subtextSizeValue').textContent  = state.subtextSize + 'px';
   $('companySizeValue').textContent  = state.companySize + 'px';
   $('taglineSizeValue').textContent  = state.taglineSize + 'px';
+  $('ctaFontSizeValue').textContent  = state.ctaFontSize + 'px';
+  $('ctaRadiusValue').textContent    = state.ctaBorderRadius + 'px';
+  $('ctaPaddingVValue').textContent  = state.ctaPaddingV + 'px';
+  $('ctaPaddingHValue').textContent  = state.ctaPaddingH + 'px';
 
   $('bannerName').value = state.bannerName || state.companyName || '';
 }
@@ -451,6 +485,12 @@ async function handleSave() {
     headlineWeight: state.headlineWeight,
     textAlign: state.textAlign,
     fontFamily: state.fontFamily,
+    ctaTextColor: state.ctaTextColor,
+    ctaFontSize: state.ctaFontSize,
+    ctaBorderRadius: state.ctaBorderRadius,
+    ctaPaddingV: state.ctaPaddingV,
+    ctaPaddingH: state.ctaPaddingH,
+    ctaFontWeight: state.ctaFontWeight,
     selectedImageBase64: state.selectedImageBase64,
     imageUrls: state.images.map((i) => i.url),
     positions: state.positions,
@@ -609,8 +649,14 @@ function loadBanner(b) {
     showCta:             b.showCta        !== false,
     primaryColor:        b.primaryColor   || '#ffffff',
     secondaryColor:      b.secondaryColor || '#f0c040',
-    ctaColor:            b.ctaColor       || '#6c63ff',
-    fontFamily:          b.fontFamily     || '',
+    ctaColor:            b.ctaColor        || '#6c63ff',
+    ctaTextColor:        b.ctaTextColor    || '#ffffff',
+    ctaFontSize:         b.ctaFontSize     || 14,
+    ctaBorderRadius:     b.ctaBorderRadius ?? 4,
+    ctaPaddingV:         b.ctaPaddingV     || 10,
+    ctaPaddingH:         b.ctaPaddingH     || 28,
+    ctaFontWeight:       b.ctaFontWeight   || '700',
+    fontFamily:          b.fontFamily      || '',
     overlayColor:        b.overlayColor   || '#000000',
     overlayOpacity:      b.overlayOpacity ?? 0.5,
     bgColor:             b.bgColor        || '#1a1a2e',
@@ -668,6 +714,12 @@ function resetBanner() {
     primaryColor: '#ffffff',
     secondaryColor: '#f0c040',
     ctaColor: '#6c63ff',
+    ctaTextColor: '#ffffff',
+    ctaFontSize: 14,
+    ctaBorderRadius: 4,
+    ctaPaddingV: 10,
+    ctaPaddingH: 28,
+    ctaFontWeight: '700',
     headlineSize: 32,
     subtextSize: 16,
     companySize: 12,
@@ -787,6 +839,8 @@ function init() {
     'editHeadlineSize', 'editSubtextSize', 'editCompanySize', 'editTaglineSize',
     'editHeadlineWeight', 'editTextAlign', 'editOverlayOpacity', 'editFontFamily',
     'editShowCta',
+    'editCtaFontSize', 'editCtaBorderRadius', 'editCtaPaddingV', 'editCtaPaddingH',
+    'editCtaFontWeight',
   ];
   liveEditors.forEach((id) => $(id).addEventListener('input', syncFromEditors));
 
@@ -796,6 +850,7 @@ function init() {
   wireColorPair('editCtaColor',       'editCtaColorHex');
   wireColorPair('editOverlayColor',   'editOverlayColorHex');
   wireColorPair('editBgColor',        'editBgColorHex');
+  wireColorPair('editCtaTextColor',   'editCtaTextColorHex');
 
   // Custom image URL
   $('useCustomImageBtn').addEventListener('click', () => {

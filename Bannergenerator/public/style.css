@@ -375,6 +375,19 @@ body {
   font-size: 11px;
 }
 
+.section-divider {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  margin-top: 4px;
+}
+.section-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  color: var(--text-muted);
+}
+
 .format-select {
   background: var(--panel-bg);
   border: 1px solid var(--border);
