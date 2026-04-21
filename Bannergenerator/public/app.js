@@ -87,6 +87,258 @@ function loadGoogleFont(family) {
   _loadedFont = family;
 }
 
+/* ── Design styles — aspect-aware layout + typography rules ──────────────── */
+/*
+ * Each style is a mini "design system":
+ *   minAspect/maxAspect — which banner shapes this style suits (w/h ratio)
+ *   textAlign, headlineWeight, overlayOpacity — style personality
+ *   cta: { radius, padV, padH, weight } — button shape/weight
+ *   typeScale: font sizes as fractions of banner height
+ *   anchors.stackX — x centre (fraction of width) for the vertical stack
+ *   anchors.cta    — 'flow' (CTA in stack) or {x, y} fractions (off-stack)
+ *   vAlign         — 'top' | 'center' | 'bottom' — how stack sits in banner
+ *   gap            — fraction of banner height between stacked elements
+ *   vPad           — fraction of banner height reserved as top/bottom margin
+ *
+ * Shuffle measures real rendered heights (offsetHeight) and flows the stack
+ * sequentially so elements never overlap.
+ */
+const DESIGN_STYLES = [
+  {
+    name: 'Bold Center',
+    minAspect: 1.2, maxAspect: 4.5,
+    textAlign: 'center', headlineWeight: '800', overlayOpacity: 0.52,
+    cta: { radius: 4, padV: 12, padH: 34, weight: '700' },
+    typeScale: { headline: 0.15, subtext: 0.058, company: 0.038, tagline: 0.036, cta: 0.052 },
+    anchors: { stackX: 0.50, cta: 'flow' },
+    vAlign: 'center', gap: 0.055, vPad: 0.06,
+  },
+  {
+    name: 'Minimal Left',
+    minAspect: 1.5, maxAspect: 6,
+    textAlign: 'left', headlineWeight: '600', overlayOpacity: 0.36,
+    cta: { radius: 2, padV: 9, padH: 26, weight: '500' },
+    typeScale: { headline: 0.12, subtext: 0.050, company: 0.034, tagline: 0.030, cta: 0.046 },
+    anchors: { stackX: 0.28, cta: 'flow' },
+    vAlign: 'center', gap: 0.05, vPad: 0.08,
+  },
+  {
+    name: 'Editorial Right',
+    minAspect: 1.4, maxAspect: 5,
+    textAlign: 'right', headlineWeight: '700', overlayOpacity: 0.45,
+    cta: { radius: 6, padV: 10, padH: 28, weight: '600' },
+    typeScale: { headline: 0.13, subtext: 0.054, company: 0.036, tagline: 0.032, cta: 0.048 },
+    anchors: { stackX: 0.72, cta: 'flow' },
+    vAlign: 'center', gap: 0.05, vPad: 0.08,
+  },
+  {
+    name: 'Modern Split',
+    minAspect: 2.0, maxAspect: 6,
+    textAlign: 'left', headlineWeight: '700', overlayOpacity: 0.42,
+    cta: { radius: 999, padV: 12, padH: 32, weight: '600' },
+    typeScale: { headline: 0.14, subtext: 0.052, company: 0.036, tagline: 0.032, cta: 0.050 },
+    anchors: { stackX: 0.30, cta: { x: 0.80, y: 0.50 } },
+    vAlign: 'center', gap: 0.05, vPad: 0.10,
+  },
+  {
+    name: 'Square Stack',
+    minAspect: 0.5, maxAspect: 1.5,
+    textAlign: 'center', headlineWeight: '800', overlayOpacity: 0.50,
+    cta: { radius: 6, padV: 11, padH: 28, weight: '700' },
+    typeScale: { headline: 0.10, subtext: 0.044, company: 0.032, tagline: 0.028, cta: 0.042 },
+    anchors: { stackX: 0.50, cta: 'flow' },
+    vAlign: 'center', gap: 0.045, vPad: 0.08,
+  },
+  {
+    name: 'Top Heavy',
+    minAspect: 1.3, maxAspect: 5,
+    textAlign: 'center', headlineWeight: '900', overlayOpacity: 0.50,
+    cta: { radius: 4, padV: 11, padH: 30, weight: '700' },
+    typeScale: { headline: 0.16, subtext: 0.055, company: 0.038, tagline: 0.034, cta: 0.050 },
+    anchors: { stackX: 0.50, cta: 'flow' },
+    vAlign: 'top', gap: 0.045, vPad: 0.07,
+  },
+  {
+    name: 'Reverse Split',
+    minAspect: 2.5, maxAspect: 6,
+    textAlign: 'right', headlineWeight: '700', overlayOpacity: 0.42,
+    cta: { radius: 999, padV: 12, padH: 32, weight: '600' },
+    typeScale: { headline: 0.14, subtext: 0.052, company: 0.036, tagline: 0.032, cta: 0.050 },
+    anchors: { stackX: 0.72, cta: { x: 0.20, y: 0.50 } },
+    vAlign: 'center', gap: 0.05, vPad: 0.10,
+  },
+  {
+    name: 'Quiet Luxe',
+    minAspect: 1.5, maxAspect: 5,
+    textAlign: 'center', headlineWeight: '400', overlayOpacity: 0.34,
+    cta: { radius: 0, padV: 10, padH: 30, weight: '500' },
+    typeScale: { headline: 0.13, subtext: 0.044, company: 0.028, tagline: 0.028, cta: 0.040 },
+    anchors: { stackX: 0.50, cta: 'flow' },
+    vAlign: 'center', gap: 0.065, vPad: 0.10,
+  },
+  {
+    name: 'Bottom Anchor',
+    minAspect: 1.4, maxAspect: 5,
+    textAlign: 'left', headlineWeight: '800', overlayOpacity: 0.48,
+    cta: { radius: 4, padV: 10, padH: 28, weight: '700' },
+    typeScale: { headline: 0.13, subtext: 0.048, company: 0.034, tagline: 0.030, cta: 0.046 },
+    anchors: { stackX: 0.28, cta: 'flow' },
+    vAlign: 'bottom', gap: 0.045, vPad: 0.07,
+  },
+];
+
+const SLIDER_BOUNDS = {
+  headlineSize: [16, 62], subtextSize: [10, 28], companySize: [8, 72],
+  taglineSize: [8, 22], ctaFontSize: [10, 36],
+};
+
+/* Vertical stacking order (top → bottom) */
+const STACK_ORDER = ['companyName', 'headline', 'subtext', 'cta', 'tagline'];
+const ELEMENT_IDS = {
+  companyName: 'previewCompanyName',
+  headline:    'previewHeadline',
+  subtext:     'previewSubtext',
+  cta:         'previewCta',
+  tagline:     'previewTagline',
+};
+
+function isElementVisible(key) {
+  if (key === 'companyName') return !!state.companyName;
+  if (key === 'headline')    return !!state.headline;
+  if (key === 'subtext')     return !!state.subtext;
+  if (key === 'cta')         return !!state.showCta;
+  if (key === 'tagline')     return !!state.tagline;
+  return false;
+}
+
+let _lastStyleIndex = -1;
+function shuffleLayout() {
+  const { sourceW: w, sourceH: h } = state.format;
+  const aspect = w / h;
+
+  // Styles whose aspect-ratio range fits the current banner
+  const eligible = DESIGN_STYLES
+    .map((s, i) => ({ s, i }))
+    .filter(({ s }) => aspect >= s.minAspect && aspect <= s.maxAspect);
+  const pool = eligible.length ? eligible : DESIGN_STYLES.map((s, i) => ({ s, i }));
+
+  // Avoid picking the same style twice in a row
+  const filtered = pool.length > 1 ? pool.filter(({ i }) => i !== _lastStyleIndex) : pool;
+  const pick = filtered[Math.floor(Math.random() * filtered.length)];
+  _lastStyleIndex = pick.i;
+  const style = pick.s;
+
+  // Type scale derived from banner height, clamped to slider bounds
+  const sized = (ratio, key) => {
+    const [min, max] = SLIDER_BOUNDS[key];
+    return Math.round(clamp(h * ratio, min, max));
+  };
+
+  // Apply style + initial sizes. Positions will be computed after measurement.
+  Object.assign(state, {
+    textAlign:       style.textAlign,
+    headlineWeight:  style.headlineWeight,
+    overlayOpacity:  style.overlayOpacity,
+    headlineSize:    sized(style.typeScale.headline, 'headlineSize'),
+    subtextSize:     sized(style.typeScale.subtext,  'subtextSize'),
+    companySize:     sized(style.typeScale.company,  'companySize'),
+    taglineSize:     sized(style.typeScale.tagline,  'taglineSize'),
+    ctaFontSize:     sized(style.typeScale.cta,      'ctaFontSize'),
+    ctaFontWeight:   style.cta.weight,
+    ctaBorderRadius: style.cta.radius,
+    ctaPaddingV:     style.cta.padV,
+    ctaPaddingH:     style.cta.padH,
+  });
+
+  // Render once so we can measure real heights
+  populateEditors();
+  renderPreview();
+  flowStack(style, w, h);
+  renderPreview();
+
+  showToast(`Layout: ${style.name}`);
+}
+
+/*
+ * flowStack — sequentially place visible stacked elements so they don't overlap.
+ * Uses offsetHeight (source pixels, unaffected by ancestor transform:scale).
+ * Shrinks font sizes proportionally if the stack exceeds the available height.
+ */
+function flowStack(style, w, h) {
+  const off = style.anchors.cta !== 'flow';
+  const stackKeys = STACK_ORDER.filter((k) => {
+    if (k === 'cta' && off) return false;
+    return isElementVisible(k);
+  });
+
+  const gapPx = Math.max(4, Math.round(h * style.gap));
+  const vPadPx = Math.round(h * style.vPad);
+  const available = Math.max(h * 0.5, h - 2 * vPadPx);
+
+  // Measure rendered heights
+  let heights = stackKeys.map((k) => $(ELEMENT_IDS[k]).offsetHeight || 0);
+  let totalH = heights.reduce((a, b) => a + b, 0) + gapPx * Math.max(0, stackKeys.length - 1);
+
+  // If stack doesn't fit, shrink font sizes proportionally and re-measure
+  if (totalH > available && stackKeys.length > 0) {
+    const gapsTotal = gapPx * Math.max(0, stackKeys.length - 1);
+    const textBudget = Math.max(1, available - gapsTotal);
+    const currentText = Math.max(1, totalH - gapsTotal);
+    const scale = textBudget / currentText;
+
+    const shrink = (val, key) => {
+      const [min, max] = SLIDER_BOUNDS[key];
+      return Math.round(clamp(val * scale, min, max));
+    };
+    Object.assign(state, {
+      headlineSize: shrink(state.headlineSize, 'headlineSize'),
+      subtextSize:  shrink(state.subtextSize,  'subtextSize'),
+      companySize:  shrink(state.companySize,  'companySize'),
+      taglineSize:  shrink(state.taglineSize,  'taglineSize'),
+      ctaFontSize:  shrink(state.ctaFontSize,  'ctaFontSize'),
+      ctaPaddingV:  Math.max(4, Math.round(state.ctaPaddingV * scale)),
+    });
+    populateEditors();
+    renderPreview();
+    heights = stackKeys.map((k) => $(ELEMENT_IDS[k]).offsetHeight || 0);
+    totalH = heights.reduce((a, b) => a + b, 0) + gapPx * Math.max(0, stackKeys.length - 1);
+  }
+
+  // Compute stack start Y based on vertical alignment
+  let startY;
+  if (style.vAlign === 'top') {
+    startY = vPadPx;
+  } else if (style.vAlign === 'bottom') {
+    startY = Math.max(vPadPx, h - vPadPx - totalH);
+  } else {
+    startY = Math.max(vPadPx, (h - totalH) / 2);
+  }
+
+  // Sequential cursor placement. Element position is its CENTRE (transform: translate(-50%,-50%)).
+  const positions = { ...state.positions };
+  const stackX = Math.round(w * style.anchors.stackX);
+  let cursor = startY;
+  stackKeys.forEach((k, i) => {
+    positions[k] = { x: stackX, y: Math.round(cursor + heights[i] / 2) };
+    cursor += heights[i] + gapPx;
+  });
+
+  // Off-stack CTA (split layouts)
+  if (off && isElementVisible('cta')) {
+    positions.cta = {
+      x: Math.round(w * style.anchors.cta.x),
+      y: Math.round(h * style.anchors.cta.y),
+    };
+  }
+
+  // Keep hidden elements' existing positions (or defaults) so they don't drift
+  for (const k of Object.keys(DEFAULT_POSITIONS)) {
+    if (!positions[k]) positions[k] = state.positions[k] || DEFAULT_POSITIONS[k];
+  }
+
+  state.positions = positions;
+}
+
 /* ── Format helpers ──────────────────────────────────────────────────────── */
 function computePreviewScale(fmt) {
   const main = document.querySelector('.main-content');
@@ -871,6 +1123,7 @@ function init() {
     state.positions = scalePositions(clonePositions(), FORMATS[0].sourceW, FORMATS[0].sourceH, state.format.sourceW, state.format.sourceH);
     renderPreview();
   });
+  $('shuffleBtn').addEventListener('click', shuffleLayout);
 
   // Format selector
   $('formatSelect').addEventListener('change', (e) => {
