@@ -62,16 +62,71 @@ function resolveUrl(base, relative) {
   }
 }
 
-function extractDesignData($) {
+const GENERIC_FONT = /^(inherit|initial|unset|revert|currentcolor|sans-serif|serif|monospace|cursive|fantasy|system-ui|-apple-system|blinkmacsystemfont|ui-sans-serif|ui-serif|ui-monospace)$/i;
+
+// Fetch stylesheets referenced by <link rel="stylesheet"> so we can extract
+// fonts/colours declared in external CSS files (most modern sites do this).
+async function fetchStylesheets($, baseUrl) {
+  const urls = [];
+  $('link[rel="stylesheet"], link[rel~="stylesheet"]').each((_, el) => {
+    const href = $(el).attr('href');
+    if (!href) return;
+    const resolved = resolveUrl(baseUrl, href);
+    if (resolved && isSafeUrl(resolved)) urls.push(resolved);
+  });
+  const toFetch = urls.slice(0, 8);
+  const chunks = await Promise.all(toFetch.map(async (url) => {
+    try {
+      const r = await fetchWithTimeout(url, 6000);
+      if (!r.ok) return '';
+      const ct = (r.headers.get('content-type') || '').toLowerCase();
+      if (!ct.includes('css') && !url.toLowerCase().includes('.css')) return '';
+      const t = await r.text();
+      return t.slice(0, 300_000);
+    } catch {
+      return '';
+    }
+  }));
+  return chunks.filter(Boolean).join('\n');
+}
+
+// Associate font-family declarations with their selectors so headline fonts
+// (h1/h2/.hero/.title) can be distinguished from body fonts (body/html/p).
+function scanFontRules(css, design) {
+  const stripped = css.replace(/@font-face\s*\{[^}]*\}/gi, '');
+  const blockRe = /([^{}@]+)\{([^{}]*)\}/g;
+  let m;
+  while ((m = blockRe.exec(stripped)) !== null) {
+    const selectors = m[1].trim().toLowerCase();
+    const body = m[2];
+    if (!selectors || !body.includes('font-family')) continue;
+    const ff = body.match(/font-family\s*:\s*([^;]+)/i);
+    if (!ff) continue;
+    const raw = ff[1].trim();
+    if (raw.startsWith('var(')) continue;
+    const first = raw.split(',')[0].replace(/['"]/g, '').trim();
+    if (!first || GENERIC_FONT.test(first)) continue;
+
+    const isHeadline = /(^|[\s,>+~])(h1|h2|h3)\b/.test(selectors)
+                    || /\.(heading|hero|title|display|banner)/.test(selectors);
+    const isBody = !isHeadline && /(^|[\s,>+~])(body|html|p)\b/.test(selectors);
+
+    if (isHeadline && !design.headlineFont) design.headlineFont = first;
+    if (isBody && !design.bodyFont) design.bodyFont = first;
+    if (!isHeadline && !isBody && !design.bodyFont) design.bodyFont = first;
+  }
+}
+
+function extractDesignData($, extraCss = '') {
   const design = {
     themeColor: '',
     googleFonts: [],
     cssVars: {},
     dominantColors: [],
     bodyFont: '',
+    headlineFont: '',
   };
 
-  // Theme color meta tag — often the primary brand colour
   design.themeColor = $('meta[name="theme-color"]').attr('content') || '';
 
   // Google Fonts from <link> tags
@@ -85,11 +140,12 @@ function extractDesignData($) {
   });
 
   const allColors = new Set();
+  const cssChunks = [];
+  $('style').each((_, el) => cssChunks.push($(el).text()));
+  if (extraCss) cssChunks.push(extraCss);
 
-  $('style').each((_, el) => {
-    const css = $(el).text();
-
-    // Google Fonts via @import inside <style>
+  for (const css of cssChunks) {
+    // Google Fonts via @import
     const imports = css.match(/@import[^;]+fonts\.googleapis\.com[^;]+/g) || [];
     imports.forEach((imp) => {
       const families = imp.match(/family=([^&'"]+)/g) || [];
@@ -99,7 +155,7 @@ function extractDesignData($) {
       });
     });
 
-    // CSS custom properties from :root — most reliable source of brand colours
+    // :root CSS vars (colour-valued only)
     const rootBlocks = css.match(/:root\s*\{[^}]+\}/g) || [];
     rootBlocks.forEach((block) => {
       for (const m of block.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)) {
@@ -110,23 +166,18 @@ function extractDesignData($) {
       }
     });
 
-    // All 6-digit hex colours in stylesheets
+    // Hex colours
     (css.match(/#[0-9a-f]{6}\b/gi) || []).forEach((c) => allColors.add(c.toLowerCase()));
 
-    // Font families
-    for (const m of css.matchAll(/font-family\s*:\s*([^;{}]+)/gi)) {
-      const first = m[1].split(',')[0].replace(/['"]/g, '').trim();
-      const skip = /^(inherit|initial|unset|sans-serif|serif|monospace|cursive|fantasy|system-ui|-apple-system)$/i;
-      if (first && !skip.test(first) && !design.bodyFont) design.bodyFont = first;
-    }
-  });
+    // Selector-aware font detection (headline vs body)
+    scanFontRules(css, design);
+  }
 
   // Inline style colours
   $('[style]').each((_, el) => {
     ($(el).attr('style').match(/#[0-9a-f]{6}\b/gi) || []).forEach((c) => allColors.add(c.toLowerCase()));
   });
 
-  // Filter out near-white and near-black; keep mid-range brand colours
   design.dominantColors = [...allColors]
     .filter((c) => {
       const r = parseInt(c.slice(1, 3), 16);
@@ -140,11 +191,14 @@ function extractDesignData($) {
   return design;
 }
 
-function extractPageData(html, baseUrl) {
+async function extractPageData(html, baseUrl) {
   const $ = cheerio.load(html);
 
+  // Fetch external stylesheets (so we can see fonts/colours declared outside inline <style>)
+  const extraCss = await fetchStylesheets($, baseUrl);
+
   // Extract design data BEFORE stripping style tags
-  const design = extractDesignData($);
+  const design = extractDesignData($, extraCss);
 
   $('script, style, nav, footer, header, [role="navigation"]').remove();
 
@@ -201,74 +255,101 @@ function extractPageData(html, baseUrl) {
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
-// Analyze a website URL and generate banner content via Claude
+// Analyze a website, image URL, or just a brand hint (company + business type)
+// and generate banner content via Claude.
 app.post('/api/analyze', async (req, res) => {
-  const { websiteUrl, facebookUrl } = req.body;
+  const { websiteUrl, imageUrl, companyName: companyNameHint, businessType } = req.body;
 
-  if (!websiteUrl) {
-    return res.status(400).json({ error: 'websiteUrl is required' });
+  if (!websiteUrl && !imageUrl && !companyNameHint && !businessType) {
+    return res.status(400).json({ error: 'Provide at least one input (website URL, image URL, company name, or business type).' });
   }
-  if (!isSafeUrl(websiteUrl)) {
-    return res.status(400).json({ error: 'Invalid or unsafe URL' });
+  for (const [name, u] of [['websiteUrl', websiteUrl], ['imageUrl', imageUrl]]) {
+    if (u && !isSafeUrl(u)) return res.status(400).json({ error: `Invalid or unsafe ${name}` });
   }
 
   try {
-    // Fetch website
-    let html = '';
-    try {
-      const response = await fetchWithTimeout(websiteUrl);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      html = await response.text();
-    } catch (err) {
-      return res.status(400).json({ error: `Could not fetch website: ${err.message}` });
-    }
+    let textContent = '';
+    let images = [];
+    let title = '';
+    let design = { themeColor: '', googleFonts: [], cssVars: {}, dominantColors: [], bodyFont: '', headlineFont: '' };
 
-    const { textContent, images, title, design } = extractPageData(html, websiteUrl);
-
-    // Optionally fetch Facebook OG image
-    if (facebookUrl && isSafeUrl(facebookUrl)) {
+    // Website is the primary source when present
+    if (websiteUrl) {
       try {
-        const fbRes = await fetchWithTimeout(facebookUrl, 8000);
-        if (fbRes.ok) {
-          const fbHtml = await fbRes.text();
-          const $fb = cheerio.load(fbHtml);
-          const fbOg = $fb('meta[property="og:image"]').attr('content');
-          if (fbOg && !images.includes(fbOg)) images.unshift(fbOg);
-        }
-      } catch {
-        // Facebook often blocks scrapers — silently ignore
+        const response = await fetchWithTimeout(websiteUrl);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const html = await response.text();
+        const page = await extractPageData(html, websiteUrl);
+        textContent = page.textContent;
+        images      = page.images;
+        title       = page.title;
+        design      = page.design;
+      } catch (err) {
+        return res.status(400).json({ error: `Could not fetch website: ${err.message}` });
       }
     }
 
-    // Build design context string for Claude
+    // Explicit image URL goes to the top of the selection
+    if (imageUrl && !images.includes(imageUrl)) images.unshift(imageUrl);
+
+    const combinedText = textContent.slice(0, 3000);
+
+    // Build design context for Claude (may be empty if no website was analysed)
     const cssVarLines = Object.entries(design.cssVars).map(([k, v]) => `  ${k}: ${v}`).join('\n') || '  (none found)';
     const designContext = `
 === DESIGN DATA EXTRACTED FROM THE PAGE ===
 Theme-color meta tag: ${design.themeColor || '(not set)'}
 Google Fonts in use:  ${design.googleFonts.length ? design.googleFonts.join(', ') : '(none detected)'}
 Body/primary font:    ${design.bodyFont || '(not detected)'}
+Headline font:        ${design.headlineFont || '(same as body)'}
 CSS brand colours (mid-range, filtered):
   ${design.dominantColors.join(', ') || '(none found)'}
 CSS custom properties (colour vars only):
 ${cssVarLines}`.trim();
 
-    const prompt = `You are an expert UI/brand designer who creates marketing banners that faithfully match a website's visual identity.
+    const brandHintLines = [
+      companyNameHint && `Company name: ${companyNameHint}`,
+      businessType    && `Business type / industry: ${businessType}`,
+    ].filter(Boolean).join('\n');
 
-Carefully study the design data extracted directly from the page's CSS. Your colour and font choices MUST be grounded in that data — do not invent colours or fonts that aren't present.
+    const sourceLines = [
+      websiteUrl && `Website: ${websiteUrl}`,
+      imageUrl   && `Image:   ${imageUrl}`,
+    ].filter(Boolean).join('\n');
 
-Website: ${websiteUrl}
+    const prompt = `You are an expert UI/brand designer AND marketing copywriter who creates banners that match a brand's identity.
+
+Your job is to return banner copy (companyName, headline, subtext, tagline, ctaText) and design tokens (colours, fontFamily, overlayOpacity).
+
+Copywriting rules:
+- If PAGE CONTENT is available, ground the copy in what the page actually says.
+- If only a company name and/or business type is given, write plausible, on-brand marketing copy for that industry. The tagline and subtext should sound like real marketing that a business of that type would use — avoid generic filler like "Visit us to learn more".
+- Use the language that the company name / business type is written in (e.g. Danish input → Danish copy).
+- Tagline should be memorable and specific to the industry (e.g. a bakery: "Fresh from the oven, every morning"; a law firm: "Clarity when it matters most").
+- Headline should be bold and concrete; subtext should state the value proposition in plain terms.
+
+Design rules:
+- Study any design data extracted from the page's CSS. Colour and font choices MUST be grounded in that data — do not invent colours or fonts that aren't present.
+- When no design data is available, pick tasteful defaults that suit the industry (e.g. calm blues for legal/finance, warm earthy tones for hospitality, bold saturated colours for fitness/energy brands).
+
+=== BRAND HINT ===
+${brandHintLines || '(not provided)'}
+
+=== SOURCES ===
+${sourceLines || '(no URLs provided — rely on BRAND HINT)'}
 
 === PAGE CONTENT ===
-${textContent}
+${combinedText || '(no textual content available — rely on BRAND HINT)'}
 
 ${designContext}
 
-Rules:
+Field rules:
 - primaryColor: the colour for body/headline text on the banner. Use white (#ffffff) if the site uses dark backgrounds, or a dark colour if the site is light.
 - secondaryColor: the site's accent/highlight colour (look for it in CSS vars or dominant colours).
 - overlayColor: a dark colour from the palette to use as the image overlay; if none found use #000000.
 - ctaColor: the site's primary action/button colour extracted from the CSS; fall back to secondaryColor.
-- fontFamily: the EXACT font-family name detected from the page (Google Font name or web-safe font). If none detected, pick a Google Font that matches the brand personality.
+- fontFamily: the EXACT body/primary font-family name detected from the page (Google Font name or web-safe font). If none detected, pick a Google Font that matches the brand personality.
+- headlineFont: the EXACT headline font detected (from h1/h2/.hero/.title CSS rules). If none detected or same as fontFamily, return "".
 - overlayOpacity: between 0.30 and 0.60 — lower if the site has a clean/minimal feel, higher for dramatic.
 
 Return ONLY a valid JSON object — no markdown, no explanation:
@@ -283,7 +364,8 @@ Return ONLY a valid JSON object — no markdown, no explanation:
   "overlayColor": "#hex",
   "overlayOpacity": 0.45,
   "ctaColor": "#hex",
-  "fontFamily": "Font Name"
+  "fontFamily": "Font Name",
+  "headlineFont": "Font Name or empty string"
 }`;
 
     const message = await anthropic.messages.create({
@@ -304,9 +386,10 @@ Return ONLY a valid JSON object — no markdown, no explanation:
         .trim();
       analysis = JSON.parse(raw);
     } catch {
+      const fallbackTitle = title || companyNameHint || 'Your Brand';
       analysis = {
-        companyName: title,
-        headline: title.split(/\s+/).slice(0, 5).join(' '),
+        companyName: fallbackTitle,
+        headline: fallbackTitle.split(/\s+/).slice(0, 5).join(' '),
         subtext: 'Visit us to learn more.',
         tagline: '',
         ctaText: 'Learn More',
@@ -316,6 +399,7 @@ Return ONLY a valid JSON object — no markdown, no explanation:
         overlayOpacity: 0.5,
         ctaColor: design.themeColor || design.dominantColors[0] || '#6c63ff',
         fontFamily: design.googleFonts[0] || design.bodyFont || '',
+        headlineFont: design.headlineFont || '',
       };
     }
 

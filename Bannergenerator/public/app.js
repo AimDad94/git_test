@@ -34,11 +34,18 @@ const state = {
   subtext: 'Supporting text will appear here after analysis',
   tagline: '',
   ctaText: 'Learn More',
+  showCompanyName: true,
+  showHeadline: true,
+  showSubtext: false,
+  showTagline: true,
   showCta: true,
   // Background
   selectedImageBase64: null,
+  imageAvgColor: null,
+  imagePixels: [],
   bgColor: '#1a1a2e',
   // Overlay
+  showOverlay: false,
   overlayColor: '#000000',
   overlayOpacity: 0.5,
   // Colors
@@ -52,10 +59,11 @@ const state = {
   ctaPaddingH: 28,
   ctaFontWeight: '700',
   fontFamily: '',
+  headlineFont: '',
   // Typography
-  headlineSize: 32,
+  headlineSize: 20,
   subtextSize: 16,
-  companySize: 12,
+  companySize: 32,
   taglineSize: 13,
   headlineWeight: '700',
   textAlign: 'center',
@@ -109,7 +117,7 @@ const DESIGN_STYLES = [
     minAspect: 1.2, maxAspect: 4.5,
     textAlign: 'center', headlineWeight: '800', overlayOpacity: 0.52,
     cta: { radius: 4, padV: 12, padH: 34, weight: '700' },
-    typeScale: { headline: 0.15, subtext: 0.058, company: 0.038, tagline: 0.036, cta: 0.052 },
+    typeScale: { headline: 0.038, subtext: 0.058, company: 0.15, tagline: 0.036, cta: 0.052 },
     anchors: { stackX: 0.50, cta: 'flow' },
     vAlign: 'center', gap: 0.055, vPad: 0.06,
   },
@@ -118,7 +126,7 @@ const DESIGN_STYLES = [
     minAspect: 1.5, maxAspect: 6,
     textAlign: 'left', headlineWeight: '600', overlayOpacity: 0.36,
     cta: { radius: 2, padV: 9, padH: 26, weight: '500' },
-    typeScale: { headline: 0.12, subtext: 0.050, company: 0.034, tagline: 0.030, cta: 0.046 },
+    typeScale: { headline: 0.034, subtext: 0.050, company: 0.12, tagline: 0.030, cta: 0.046 },
     anchors: { stackX: 0.28, cta: 'flow' },
     vAlign: 'center', gap: 0.05, vPad: 0.08,
   },
@@ -127,7 +135,7 @@ const DESIGN_STYLES = [
     minAspect: 1.4, maxAspect: 5,
     textAlign: 'right', headlineWeight: '700', overlayOpacity: 0.45,
     cta: { radius: 6, padV: 10, padH: 28, weight: '600' },
-    typeScale: { headline: 0.13, subtext: 0.054, company: 0.036, tagline: 0.032, cta: 0.048 },
+    typeScale: { headline: 0.036, subtext: 0.054, company: 0.13, tagline: 0.032, cta: 0.048 },
     anchors: { stackX: 0.72, cta: 'flow' },
     vAlign: 'center', gap: 0.05, vPad: 0.08,
   },
@@ -136,7 +144,7 @@ const DESIGN_STYLES = [
     minAspect: 2.0, maxAspect: 6,
     textAlign: 'left', headlineWeight: '700', overlayOpacity: 0.42,
     cta: { radius: 999, padV: 12, padH: 32, weight: '600' },
-    typeScale: { headline: 0.14, subtext: 0.052, company: 0.036, tagline: 0.032, cta: 0.050 },
+    typeScale: { headline: 0.036, subtext: 0.052, company: 0.14, tagline: 0.032, cta: 0.050 },
     anchors: { stackX: 0.30, cta: { x: 0.80, y: 0.50 } },
     vAlign: 'center', gap: 0.05, vPad: 0.10,
   },
@@ -145,7 +153,7 @@ const DESIGN_STYLES = [
     minAspect: 0.5, maxAspect: 1.5,
     textAlign: 'center', headlineWeight: '800', overlayOpacity: 0.50,
     cta: { radius: 6, padV: 11, padH: 28, weight: '700' },
-    typeScale: { headline: 0.10, subtext: 0.044, company: 0.032, tagline: 0.028, cta: 0.042 },
+    typeScale: { headline: 0.032, subtext: 0.044, company: 0.10, tagline: 0.028, cta: 0.042 },
     anchors: { stackX: 0.50, cta: 'flow' },
     vAlign: 'center', gap: 0.045, vPad: 0.08,
   },
@@ -154,7 +162,7 @@ const DESIGN_STYLES = [
     minAspect: 1.3, maxAspect: 5,
     textAlign: 'center', headlineWeight: '900', overlayOpacity: 0.50,
     cta: { radius: 4, padV: 11, padH: 30, weight: '700' },
-    typeScale: { headline: 0.16, subtext: 0.055, company: 0.038, tagline: 0.034, cta: 0.050 },
+    typeScale: { headline: 0.038, subtext: 0.055, company: 0.16, tagline: 0.034, cta: 0.050 },
     anchors: { stackX: 0.50, cta: 'flow' },
     vAlign: 'top', gap: 0.045, vPad: 0.07,
   },
@@ -163,7 +171,7 @@ const DESIGN_STYLES = [
     minAspect: 2.5, maxAspect: 6,
     textAlign: 'right', headlineWeight: '700', overlayOpacity: 0.42,
     cta: { radius: 999, padV: 12, padH: 32, weight: '600' },
-    typeScale: { headline: 0.14, subtext: 0.052, company: 0.036, tagline: 0.032, cta: 0.050 },
+    typeScale: { headline: 0.036, subtext: 0.052, company: 0.14, tagline: 0.032, cta: 0.050 },
     anchors: { stackX: 0.72, cta: { x: 0.20, y: 0.50 } },
     vAlign: 'center', gap: 0.05, vPad: 0.10,
   },
@@ -172,7 +180,7 @@ const DESIGN_STYLES = [
     minAspect: 1.5, maxAspect: 5,
     textAlign: 'center', headlineWeight: '400', overlayOpacity: 0.34,
     cta: { radius: 0, padV: 10, padH: 30, weight: '500' },
-    typeScale: { headline: 0.13, subtext: 0.044, company: 0.028, tagline: 0.028, cta: 0.040 },
+    typeScale: { headline: 0.028, subtext: 0.044, company: 0.13, tagline: 0.028, cta: 0.040 },
     anchors: { stackX: 0.50, cta: 'flow' },
     vAlign: 'center', gap: 0.065, vPad: 0.10,
   },
@@ -181,7 +189,7 @@ const DESIGN_STYLES = [
     minAspect: 1.4, maxAspect: 5,
     textAlign: 'left', headlineWeight: '800', overlayOpacity: 0.48,
     cta: { radius: 4, padV: 10, padH: 28, weight: '700' },
-    typeScale: { headline: 0.13, subtext: 0.048, company: 0.034, tagline: 0.030, cta: 0.046 },
+    typeScale: { headline: 0.034, subtext: 0.048, company: 0.13, tagline: 0.030, cta: 0.046 },
     anchors: { stackX: 0.28, cta: 'flow' },
     vAlign: 'bottom', gap: 0.045, vPad: 0.07,
   },
@@ -203,11 +211,11 @@ const ELEMENT_IDS = {
 };
 
 function isElementVisible(key) {
-  if (key === 'companyName') return !!state.companyName;
-  if (key === 'headline')    return !!state.headline;
-  if (key === 'subtext')     return !!state.subtext;
+  if (key === 'companyName') return !!state.showCompanyName && !!state.companyName;
+  if (key === 'headline')    return !!state.showHeadline    && !!state.headline;
+  if (key === 'subtext')     return !!state.showSubtext     && !!state.subtext;
   if (key === 'cta')         return !!state.showCta;
-  if (key === 'tagline')     return !!state.tagline;
+  if (key === 'tagline')     return !!state.showTagline     && !!state.tagline;
   return false;
 }
 
@@ -379,13 +387,18 @@ function renderPreview() {
   const preview = $('bannerPreview');
   const overlay = $('bannerOverlay');
 
-  // Font
+  // Fonts — body/primary for the whole preview; headlineFont (if distinct)
+  // gets applied to headline+company below for a typographic hierarchy.
   if (state.fontFamily) {
     loadGoogleFont(state.fontFamily);
     preview.style.fontFamily = `'${state.fontFamily}', sans-serif`;
   } else {
     preview.style.fontFamily = '';
   }
+  const headlineFontStack = state.headlineFont
+    ? `'${state.headlineFont}', ${state.fontFamily ? `'${state.fontFamily}', ` : ''}sans-serif`
+    : '';
+  if (state.headlineFont) loadGoogleFont(state.headlineFont);
 
   // Background
   preview.style.backgroundImage = state.selectedImageBase64
@@ -393,8 +406,12 @@ function renderPreview() {
   preview.style.backgroundColor = state.bgColor;
 
   // Overlay
-  const { r, g, b } = hexToRgb(state.overlayColor);
-  overlay.style.backgroundColor = `rgba(${r},${g},${b},${state.overlayOpacity})`;
+  if (state.showOverlay) {
+    const { r, g, b } = hexToRgb(state.overlayColor);
+    overlay.style.backgroundColor = `rgba(${r},${g},${b},${state.overlayOpacity})`;
+  } else {
+    overlay.style.backgroundColor = 'transparent';
+  }
 
   // ── Position + style each draggable element ──────────────────────────────
   const pos = state.positions;
@@ -404,10 +421,11 @@ function renderPreview() {
   company.textContent = state.companyName;
   company.style.color = state.primaryColor;
   company.style.fontSize = state.companySize + 'px';
+  company.style.fontFamily = headlineFontStack || '';
   company.style.left = pos.companyName.x + 'px';
   company.style.top  = pos.companyName.y + 'px';
   company.style.textAlign = state.textAlign;
-  company.style.display = state.companyName ? '' : 'none';
+  company.style.display = isElementVisible('companyName') ? '' : 'none';
 
   // Headline
   const headline = $('previewHeadline');
@@ -415,9 +433,11 @@ function renderPreview() {
   headline.style.color = state.primaryColor;
   headline.style.fontSize = state.headlineSize + 'px';
   headline.style.fontWeight = state.headlineWeight;
+  headline.style.fontFamily = headlineFontStack || '';
   headline.style.left = pos.headline.x + 'px';
   headline.style.top  = pos.headline.y + 'px';
   headline.style.textAlign = state.textAlign;
+  headline.style.display = isElementVisible('headline') ? '' : 'none';
 
   // Subtext
   const subtext = $('previewSubtext');
@@ -427,7 +447,7 @@ function renderPreview() {
   subtext.style.left = pos.subtext.x + 'px';
   subtext.style.top  = pos.subtext.y + 'px';
   subtext.style.textAlign = state.textAlign;
-  subtext.style.display = state.subtext ? '' : 'none';
+  subtext.style.display = isElementVisible('subtext') ? '' : 'none';
 
   // CTA
   const cta = $('previewCta');
@@ -440,7 +460,7 @@ function renderPreview() {
   cta.style.padding = `${state.ctaPaddingV}px ${state.ctaPaddingH}px`;
   cta.style.left = pos.cta.x + 'px';
   cta.style.top  = pos.cta.y + 'px';
-  cta.style.display = state.showCta ? '' : 'none';
+  cta.style.display = isElementVisible('cta') ? '' : 'none';
 
   // Tagline
   const tagline = $('previewTagline');
@@ -450,7 +470,7 @@ function renderPreview() {
   tagline.style.left = pos.tagline.x + 'px';
   tagline.style.top  = pos.tagline.y + 'px';
   tagline.style.textAlign = state.textAlign;
-  tagline.style.display = state.tagline ? '' : 'none';
+  tagline.style.display = isElementVisible('tagline') ? '' : 'none';
 }
 
 /* ── Drag to reposition ──────────────────────────────────────────────────── */
@@ -505,11 +525,16 @@ function syncFromEditors() {
   state.subtext       = $('editSubtext').value;
   state.tagline       = $('editTagline').value;
   state.ctaText       = $('editCta').value;
-  state.showCta       = $('editShowCta').checked;
+  state.showCompanyName = $('editShowCompanyName').checked;
+  state.showHeadline    = $('editShowHeadline').checked;
+  state.showSubtext     = $('editShowSubtext').checked;
+  state.showTagline     = $('editShowTagline').checked;
+  state.showCta         = $('editShowCta').checked;
 
   state.primaryColor  = $('editPrimaryColor').value;
   state.secondaryColor = $('editSecondaryColor').value;
   state.ctaColor      = $('editCtaColor').value;
+  state.showOverlay   = $('editShowOverlay').checked;
   state.overlayColor  = $('editOverlayColor').value;
   state.overlayOpacity = parseFloat($('editOverlayOpacity').value);
   state.bgColor       = $('editBgColor').value;
@@ -558,11 +583,16 @@ function populateEditors() {
   $('editSubtext').value      = state.subtext;
   $('editTagline').value      = state.tagline;
   $('editCta').value          = state.ctaText;
-  $('editShowCta').checked    = state.showCta;
+  $('editShowCompanyName').checked = state.showCompanyName;
+  $('editShowHeadline').checked    = state.showHeadline;
+  $('editShowSubtext').checked     = state.showSubtext;
+  $('editShowTagline').checked     = state.showTagline;
+  $('editShowCta').checked         = state.showCta;
 
   $('editPrimaryColor').value   = state.primaryColor;
   $('editSecondaryColor').value = state.secondaryColor;
   $('editCtaColor').value       = state.ctaColor;
+  $('editShowOverlay').checked  = state.showOverlay;
   $('editOverlayColor').value   = state.overlayColor;
   $('editOverlayOpacity').value = state.overlayOpacity;
   $('editBgColor').value        = state.bgColor;
@@ -605,9 +635,15 @@ function populateEditors() {
 /* ── Analyze ─────────────────────────────────────────────────────────────── */
 async function handleAnalyze(e) {
   e.preventDefault();
-  const websiteUrl = $('websiteUrl').value.trim();
-  const facebookUrl = $('facebookUrl').value.trim();
-  const imageUrl = $('imageUrl').value.trim();
+  const websiteUrl   = $('websiteUrl').value.trim();
+  const imageUrl     = $('imageUrl').value.trim();
+  const companyName  = $('analyzeCompanyName').value.trim();
+  const businessType = $('analyzeBusinessType').value.trim();
+
+  if (!websiteUrl && !imageUrl && !companyName && !businessType) {
+    showError('Please provide at least one input (website URL, image URL, company name, or business type).');
+    return;
+  }
 
   setLoading(true);
   clearError();
@@ -616,7 +652,12 @@ async function handleAnalyze(e) {
     const res = await fetch('/api/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ websiteUrl, facebookUrl: facebookUrl || undefined }),
+      body: JSON.stringify({
+        websiteUrl:   websiteUrl   || undefined,
+        imageUrl:     imageUrl     || undefined,
+        companyName:  companyName  || undefined,
+        businessType: businessType || undefined,
+      }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Analysis failed');
@@ -636,19 +677,32 @@ async function handleAnalyze(e) {
       overlayOpacity: clamp(parseFloat(analysis.overlayOpacity) || 0.5, 0, 1),
       ctaColor:       isHex(analysis.ctaColor)       ? analysis.ctaColor       : (isHex(analysis.secondaryColor) ? analysis.secondaryColor : '#6c63ff'),
       fontFamily:     analysis.fontFamily || '',
+      headlineFont:   analysis.headlineFont || '',
       images:         images.map((url) => ({ url, base64: null })),
-      showCta:        true,
+      showCompanyName: true,
+      showHeadline:    true,
+      showSubtext:     false,
+      showTagline:     true,
+      showCta:         true,
+      showOverlay:     false,
       selectedImageBase64: null,
+      imageAvgColor:   null,
+      imagePixels:     [],
       currentBannerId: null,
       bannerName:     analysis.companyName || '',
       positions:      scalePositions(clonePositions(), FORMATS[0].sourceW, FORMATS[0].sourceH, state.format.sourceW, state.format.sourceH),
     });
 
-    // Prepend manually entered image URL so it takes priority
-    if (imageUrl) {
+    // Server already prepends the manually entered image URL; just ensure
+    // it's in the local state list if the server somehow dropped it.
+    if (imageUrl && !state.images.some((i) => i.url === imageUrl)) {
       state.images.unshift({ url: imageUrl, base64: null });
       images.unshift(imageUrl);
     }
+
+    // First pass: fix contrast against bgColor fallback (will re-check once
+    // an image is selected, since the avg image colour may differ)
+    ensureReadableColors();
 
     populateEditors();
     renderPreview();
@@ -687,11 +741,21 @@ async function selectImage(url) {
     el.classList.toggle('selected', el.src === url);
   });
 
+  const applyImage = async (dataUrl) => {
+    state.selectedImageBase64 = dataUrl;
+    const { avg, samples } = await sampleImagePixels(dataUrl);
+    state.imageAvgColor = avg;
+    state.imagePixels   = samples;
+    const changes = ensureReadableColors();
+    populateEditors();
+    renderPreview();
+    if (changes.length) showToast(`Adjusted ${changes.join(' & ')} colour for readability`);
+  };
+
   // Check cache
   const cached = state.images.find((i) => i.url === url);
   if (cached && cached.base64) {
-    state.selectedImageBase64 = cached.base64;
-    renderPreview();
+    await applyImage(cached.base64);
     return;
   }
 
@@ -705,8 +769,7 @@ async function selectImage(url) {
     if (entry) entry.base64 = dataUrl;
     else state.images.push({ url, base64: dataUrl });
 
-    state.selectedImageBase64 = dataUrl;
-    renderPreview();
+    await applyImage(dataUrl);
   } catch (err) {
     console.warn('Image load failed:', err.message);
     showError('Could not load that image. Try another.');
@@ -723,10 +786,15 @@ async function handleSave() {
     subtext: state.subtext,
     tagline: state.tagline,
     ctaText: state.ctaText,
+    showCompanyName: state.showCompanyName,
+    showHeadline: state.showHeadline,
+    showSubtext: state.showSubtext,
+    showTagline: state.showTagline,
     showCta: state.showCta,
     primaryColor: state.primaryColor,
     secondaryColor: state.secondaryColor,
     ctaColor: state.ctaColor,
+    showOverlay: state.showOverlay,
     overlayColor: state.overlayColor,
     overlayOpacity: state.overlayOpacity,
     bgColor: state.bgColor,
@@ -737,6 +805,7 @@ async function handleSave() {
     headlineWeight: state.headlineWeight,
     textAlign: state.textAlign,
     fontFamily: state.fontFamily,
+    headlineFont: state.headlineFont,
     ctaTextColor: state.ctaTextColor,
     ctaFontSize: state.ctaFontSize,
     ctaBorderRadius: state.ctaBorderRadius,
@@ -898,7 +967,11 @@ function loadBanner(b) {
     subtext:             b.subtext        || '',
     tagline:             b.tagline        || '',
     ctaText:             b.ctaText        || 'Learn More',
-    showCta:             b.showCta        !== false,
+    showCompanyName:     b.showCompanyName !== false,
+    showHeadline:        b.showHeadline    !== false,
+    showSubtext:         b.showSubtext     !== false,
+    showTagline:         b.showTagline     !== false,
+    showCta:             b.showCta         !== false,
     primaryColor:        b.primaryColor   || '#ffffff',
     secondaryColor:      b.secondaryColor || '#f0c040',
     ctaColor:            b.ctaColor        || '#6c63ff',
@@ -909,16 +982,20 @@ function loadBanner(b) {
     ctaPaddingH:         b.ctaPaddingH     || 28,
     ctaFontWeight:       b.ctaFontWeight   || '700',
     fontFamily:          b.fontFamily      || '',
+    headlineFont:        b.headlineFont    || '',
+    showOverlay:         b.showOverlay === true,
     overlayColor:        b.overlayColor   || '#000000',
     overlayOpacity:      b.overlayOpacity ?? 0.5,
     bgColor:             b.bgColor        || '#1a1a2e',
-    headlineSize:        b.headlineSize   || 32,
+    headlineSize:        b.headlineSize   || 20,
     subtextSize:         b.subtextSize    || 16,
-    companySize:         b.companySize    || 12,
+    companySize:         b.companySize    || 32,
     taglineSize:         b.taglineSize    || 13,
     headlineWeight:      b.headlineWeight || '700',
     textAlign:           b.textAlign      || 'center',
     selectedImageBase64: b.selectedImageBase64 || null,
+    imageAvgColor:       null,
+    imagePixels:         [],
     images:              (b.imageUrls || []).map((url) => ({ url, base64: null })),
     currentBannerId:     b.id,
     bannerName:          b.name || b.companyName || '',
@@ -933,6 +1010,14 @@ function loadBanner(b) {
 
   populateEditors();
   renderPreview();
+
+  // Re-sample image pixels so contrast helpers have fresh data after load
+  if (state.selectedImageBase64) {
+    sampleImagePixels(state.selectedImageBase64).then(({ avg, samples }) => {
+      state.imageAvgColor = avg;
+      state.imagePixels   = samples;
+    });
+  }
 }
 
 async function deleteBanner(id) {
@@ -958,9 +1043,16 @@ function resetBanner() {
     subtext: 'Supporting text will appear here after analysis',
     tagline: '',
     ctaText: 'Learn More',
+    showCompanyName: true,
+    showHeadline: true,
+    showSubtext: false,
+    showTagline: true,
     showCta: true,
     selectedImageBase64: null,
+    imageAvgColor: null,
+    imagePixels: [],
     bgColor: '#1a1a2e',
+    showOverlay: false,
     overlayColor: '#000000',
     overlayOpacity: 0.5,
     primaryColor: '#ffffff',
@@ -972,9 +1064,9 @@ function resetBanner() {
     ctaPaddingV: 10,
     ctaPaddingH: 28,
     ctaFontWeight: '700',
-    headlineSize: 32,
+    headlineSize: 20,
     subtextSize: 16,
-    companySize: 12,
+    companySize: 32,
     taglineSize: 13,
     headlineWeight: '700',
     textAlign: 'center',
@@ -1071,6 +1163,288 @@ function clamp(n, min, max) {
   return Math.min(Math.max(n, min), max);
 }
 
+function rgbToHex({ r, g, b }) {
+  const h = (v) => Math.round(clamp(v, 0, 255)).toString(16).padStart(2, '0');
+  return '#' + h(r) + h(g) + h(b);
+}
+
+/* WCAG relative luminance (0–1) for a hex colour */
+function relativeLuminance(hex) {
+  const { r, g, b } = hexToRgb(hex);
+  const toLin = (c) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * toLin(r) + 0.7152 * toLin(g) + 0.0722 * toLin(b);
+}
+
+/* WCAG contrast ratio between two hex colours (1–21) */
+function contrastRatio(hexA, hexB) {
+  const la = relativeLuminance(hexA);
+  const lb = relativeLuminance(hexB);
+  const [lo, hi] = la < lb ? [la, lb] : [lb, la];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/* Hex → HSL (h: 0–360, s/l: 0–1) */
+function hexToHsl(hex) {
+  const { r, g, b } = hexToRgb(hex);
+  const rn = r / 255, gn = g / 255, bn = b / 255;
+  const max = Math.max(rn, gn, bn), min = Math.min(rn, gn, bn);
+  const l = (max + min) / 2;
+  let h = 0, s = 0;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    if (max === rn)      h = ((gn - bn) / d + (gn < bn ? 6 : 0));
+    else if (max === gn) h = ((bn - rn) / d + 2);
+    else                 h = ((rn - gn) / d + 4);
+    h *= 60;
+  }
+  return { h, s, l };
+}
+
+/* HSL → hex */
+function hslToHex(h, s, l) {
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  let rp = 0, gp = 0, bp = 0;
+  if      (h < 60)  { rp = c; gp = x; bp = 0; }
+  else if (h < 120) { rp = x; gp = c; bp = 0; }
+  else if (h < 180) { rp = 0; gp = c; bp = x; }
+  else if (h < 240) { rp = 0; gp = x; bp = c; }
+  else if (h < 300) { rp = x; gp = 0; bp = c; }
+  else              { rp = c; gp = 0; bp = x; }
+  return rgbToHex({ r: (rp + m) * 255, g: (gp + m) * 255, b: (bp + m) * 255 });
+}
+
+/* Circular distance between two hues (0–180). Neutrals pass `null` → treated
+   as a medium distance so a vivid near-hue match still beats a pure neutral. */
+function hueDistance(a, b) {
+  if (a == null || b == null) return 120;
+  const d = Math.abs(a - b) % 360;
+  return d > 180 ? 360 - d : d;
+}
+
+/* Build a palette of ~90 candidate text colours spanning the hue/lightness
+   spectrum, plus extra variants along the original text colour's hue so
+   brand-flavoured choices get preference when they pass contrast. */
+function contrastSpectrumCandidates(orig) {
+  const out = [];
+  // Neutrals
+  out.push({ hex: '#ffffff', hue: null });
+  out.push({ hex: '#f5f5f5', hue: null });
+  out.push({ hex: '#111111', hue: null });
+  out.push({ hex: '#2a2a2a', hue: null });
+  // Full spectrum: 12 hues × 6 lightness × 2 saturation — added near-black/near-white
+  // coloured variants so we have options that can beat pure B/W on contrast
+  // while still keeping a hue.
+  const hues = [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330];
+  const lightnesses = [0.1, 0.22, 0.38, 0.62, 0.82, 0.93];
+  const saturations = [0.85, 0.55];
+  for (const h of hues) {
+    for (const l of lightnesses) {
+      for (const s of saturations) {
+        out.push({ hex: hslToHex(h, s, l), hue: h });
+      }
+    }
+  }
+  // Brand-preserving: extra lightness steps along the original hue
+  if (orig && orig.s > 0.1) {
+    const sBrand = Math.max(orig.s, 0.65);
+    for (const l of [0.1, 0.18, 0.28, 0.4, 0.55, 0.7, 0.82, 0.92]) {
+      out.push({ hex: hslToHex(orig.h, sBrand, l), hue: orig.h });
+    }
+  }
+  return out;
+}
+
+/* Blend foreground over background by alpha (0–1); returns hex */
+function blendHex(bgHex, fgHex, alpha) {
+  const a = clamp(alpha, 0, 1);
+  const bg = hexToRgb(bgHex);
+  const fg = hexToRgb(fgHex);
+  return rgbToHex({
+    r: fg.r * a + bg.r * (1 - a),
+    g: fg.g * a + bg.g * (1 - a),
+    b: fg.b * a + bg.b * (1 - a),
+  });
+}
+
+/* Sample an image (data URL) to a 32×32 canvas and return
+   { avg, samples } where samples is an array of ~1024 hex colours */
+function sampleImagePixels(dataUrl) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas');
+        c.width = 32; c.height = 32;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(img, 0, 0, 32, 32);
+        const data = ctx.getImageData(0, 0, 32, 32).data;
+        const samples = [];
+        let r = 0, g = 0, b = 0, n = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          const pr = data[i], pg = data[i + 1], pb = data[i + 2];
+          samples.push(rgbToHex({ r: pr, g: pg, b: pb }));
+          r += pr; g += pg; b += pb; n++;
+        }
+        resolve({
+          avg: rgbToHex({ r: r / n, g: g / n, b: b / n }),
+          samples,
+        });
+      } catch {
+        resolve({ avg: null, samples: [] });
+      }
+    };
+    img.onerror = () => resolve({ avg: null, samples: [] });
+    img.src = dataUrl;
+  });
+}
+
+/* Fraction of pixel samples where `textHex` meets the minimum contrast ratio.
+   When overlay is active, each pixel is first composited with the overlay.
+   Returns 1.0 when the image is missing (caller should fall back to bgColor). */
+function readabilityScore(textHex, minRatio = 3.5) {
+  const samples = state.imagePixels;
+  if (!samples || !samples.length) return 1.0;
+  let ok = 0;
+  for (const pix of samples) {
+    const bg = state.showOverlay
+      ? blendHex(pix, state.overlayColor, state.overlayOpacity)
+      : pix;
+    if (contrastRatio(textHex, bg) >= minRatio) ok++;
+  }
+  return ok / samples.length;
+}
+
+/* Effective background colour for contrast checks when no image is present
+   (or as a fallback). Composites bgColor with overlay if active. */
+function effectiveBackgroundColor() {
+  const base = state.imageAvgColor || state.bgColor || '#1a1a2e';
+  if (state.showOverlay) return blendHex(base, state.overlayColor, state.overlayOpacity);
+  return base;
+}
+
+/* Pick a readable text colour. Strategy:
+   1. If the original text already passes, keep it.
+   2. Try coloured candidates (non-neutral) that clear `passThreshold` — prefer
+      closest hue to the original, break ties by higher score.
+   3. If no coloured candidate passes, try coloured candidates at a relaxed
+      `softThreshold` — prefer highest score.
+   4. Only fall back to a neutral (white / near-black) if even the softened
+      coloured search comes up empty. B/W is the last resort, not the default. */
+function readableTextColor(textHex, minRatio = 3.5, passThreshold = 0.80, softThreshold = 0.65) {
+  const hasImage = state.imagePixels && state.imagePixels.length;
+  const orig = hexToHsl(textHex);
+  const origHasHue = orig.s > 0.15;
+
+  if (!hasImage) {
+    const bg = effectiveBackgroundColor();
+    if (contrastRatio(textHex, bg) >= minRatio) return textHex;
+    const candidates = contrastSpectrumCandidates(orig);
+    let best = null;
+    for (const c of candidates) {
+      if (c.hue == null) continue; // skip neutrals on the first pass
+      if (contrastRatio(c.hex, bg) < minRatio) continue;
+      const distance = origHasHue ? hueDistance(orig.h, c.hue) : 0;
+      if (!best || distance < best.distance) best = { hex: c.hex, distance };
+    }
+    if (best) return best.hex;
+    return relativeLuminance(bg) > 0.5 ? '#111111' : '#ffffff';
+  }
+
+  const currentScore = readabilityScore(textHex, minRatio);
+  if (currentScore >= passThreshold) return textHex;
+
+  const candidates = contrastSpectrumCandidates(orig);
+  const scored = candidates.map((c) => ({
+    hex: c.hex,
+    hue: c.hue,
+    isNeutral: c.hue == null,
+    score: readabilityScore(c.hex, minRatio),
+    distance: origHasHue ? hueDistance(orig.h, c.hue) : 0,
+  }));
+
+  // Pass 1: coloured candidates above passThreshold — closest hue wins
+  const colouredStrong = scored.filter((s) => !s.isNeutral && s.score >= passThreshold);
+  if (colouredStrong.length) {
+    colouredStrong.sort((a, b) => (a.distance - b.distance) || (b.score - a.score));
+    return colouredStrong[0].hex;
+  }
+
+  // Pass 2: coloured candidates at relaxed threshold — highest score wins
+  const colouredSoft = scored.filter((s) => !s.isNeutral && s.score >= softThreshold);
+  if (colouredSoft.length) {
+    colouredSoft.sort((a, b) => (b.score - a.score) || (a.distance - b.distance));
+    return colouredSoft[0].hex;
+  }
+
+  // Pass 3: no coloured candidate is usable — fall back to the best neutral
+  const neutrals = scored.filter((s) => s.isNeutral);
+  neutrals.sort((a, b) => b.score - a.score);
+  if (neutrals.length && neutrals[0].score > currentScore + 0.05) return neutrals[0].hex;
+  return textHex;
+}
+
+/* CTA button contrast check — CTA sits on a solid button colour. Same
+   preference order as `readableTextColor`: coloured first, neutrals last. */
+function readableCtaTextColor(textHex, btnHex, minRatio = 3.5) {
+  if (contrastRatio(textHex, btnHex) >= minRatio) return textHex;
+
+  const orig = hexToHsl(textHex);
+  const origHasHue = orig.s > 0.15;
+  const candidates = contrastSpectrumCandidates(orig);
+
+  const colouredPass = [];
+  let bestNeutral = null;
+  for (const c of candidates) {
+    const ratio = contrastRatio(c.hex, btnHex);
+    if (ratio < minRatio) continue;
+    const distance = origHasHue ? hueDistance(orig.h, c.hue) : 0;
+    if (c.hue == null) {
+      if (!bestNeutral || ratio > bestNeutral.ratio) bestNeutral = { hex: c.hex, ratio };
+    } else {
+      colouredPass.push({ hex: c.hex, distance, ratio });
+    }
+  }
+  if (colouredPass.length) {
+    colouredPass.sort((a, b) => (a.distance - b.distance) || (b.ratio - a.ratio));
+    return colouredPass[0].hex;
+  }
+  if (bestNeutral) return bestNeutral.hex;
+  return relativeLuminance(btnHex) > 0.5 ? '#111111' : '#ffffff';
+}
+
+/* Audit text colours and flip any that fail contrast. Mutates state and
+   returns an array of changes for reporting. */
+function ensureReadableColors() {
+  const changes = [];
+
+  const newPrimary = readableTextColor(state.primaryColor, 3.5);
+  if (newPrimary !== state.primaryColor) {
+    changes.push('text');
+    state.primaryColor = newPrimary;
+  }
+
+  const newSecondary = readableTextColor(state.secondaryColor, 3.0);
+  if (newSecondary !== state.secondaryColor) {
+    changes.push('accent');
+    state.secondaryColor = newSecondary;
+  }
+
+  const newCtaText = readableCtaTextColor(state.ctaTextColor, state.ctaColor, 3.5);
+  if (newCtaText !== state.ctaTextColor) {
+    changes.push('CTA text');
+    state.ctaTextColor = newCtaText;
+  }
+
+  return changes;
+}
+
 function escHtml(str) {
   return String(str)
     .replace(/&/g, '&amp;')
@@ -1090,11 +1464,25 @@ function init() {
     'editCompanyName', 'editHeadline', 'editSubtext', 'editTagline', 'editCta',
     'editHeadlineSize', 'editSubtextSize', 'editCompanySize', 'editTaglineSize',
     'editHeadlineWeight', 'editTextAlign', 'editOverlayOpacity', 'editFontFamily',
-    'editShowCta',
+    'editShowCompanyName', 'editShowHeadline', 'editShowSubtext',
+    'editShowTagline', 'editShowCta', 'editShowOverlay',
     'editCtaFontSize', 'editCtaBorderRadius', 'editCtaPaddingV', 'editCtaPaddingH',
     'editCtaFontWeight',
   ];
   liveEditors.forEach((id) => $(id).addEventListener('input', syncFromEditors));
+  // Checkboxes need 'change' too (some browsers fire only 'change' for them)
+  ['editShowCompanyName','editShowHeadline','editShowSubtext','editShowTagline','editShowCta','editShowOverlay']
+    .forEach((id) => $(id).addEventListener('change', syncFromEditors));
+
+  // A "Check contrast" button: re-audits and fixes text colours on demand
+  $('checkContrastBtn')?.addEventListener('click', () => {
+    const changes = ensureReadableColors();
+    populateEditors();
+    renderPreview();
+    showToast(changes.length
+      ? `Adjusted ${changes.join(' & ')} colour for readability`
+      : 'Contrast looks good.');
+  });
 
   // Color pair syncing (picker ↔ hex text)
   wireColorPair('editPrimaryColor',   'editPrimaryColorHex');

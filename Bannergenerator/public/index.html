@@ -19,19 +19,24 @@
 
       <!-- Analyze Form -->
       <section class="panel">
-        <h2 class="panel-title">Generate from Website</h2>
+        <h2 class="panel-title">Generate from Sources</h2>
+        <p class="panel-hint">Provide at least one source below.</p>
         <form id="analyzeForm">
           <div class="field">
-            <label for="websiteUrl">Website URL</label>
-            <input type="url" id="websiteUrl" placeholder="https://example.com" required>
-          </div>
-          <div class="field">
-            <label for="facebookUrl">Facebook URL <span class="optional">(optional)</span></label>
-            <input type="url" id="facebookUrl" placeholder="https://facebook.com/page">
+            <label for="websiteUrl">Website URL <span class="optional">(optional)</span></label>
+            <input type="url" id="websiteUrl" placeholder="https://example.com">
           </div>
           <div class="field">
             <label for="imageUrl">Background Image URL <span class="optional">(optional)</span></label>
             <input type="url" id="imageUrl" placeholder="https://example.com/image.jpg">
+          </div>
+          <div class="field">
+            <label for="analyzeCompanyName">Company Name <span class="optional">(optional)</span></label>
+            <input type="text" id="analyzeCompanyName" placeholder="Acme Corp">
+          </div>
+          <div class="field">
+            <label for="analyzeBusinessType">Business Type / Industry <span class="optional">(optional)</span></label>
+            <input type="text" id="analyzeBusinessType" placeholder="e.g. dental clinic, SaaS, bakery, law firm">
           </div>
           <button type="submit" id="analyzeBtn" class="btn btn-primary btn-full">
             <span id="analyzeBtnText">Analyze &amp; Generate</span>
@@ -107,31 +112,54 @@
         <div class="tab-content active" id="tab-text">
           <div class="editor-grid-2">
             <div class="field">
-              <label>Company Name</label>
+              <div class="label-row">
+                <label>Company Name</label>
+                <label class="toggle toggle-sm" title="Show in banner">
+                  <input type="checkbox" id="editShowCompanyName" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
               <input type="text" id="editCompanyName" placeholder="Acme Corp">
             </div>
             <div class="field">
-              <label>Tagline</label>
+              <div class="label-row">
+                <label>Tagline</label>
+                <label class="toggle toggle-sm" title="Show in banner">
+                  <input type="checkbox" id="editShowTagline" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
               <input type="text" id="editTagline" placeholder="Short memorable tagline">
             </div>
             <div class="field span-2">
-              <label>Headline</label>
+              <div class="label-row">
+                <label>Headline</label>
+                <label class="toggle toggle-sm" title="Show in banner">
+                  <input type="checkbox" id="editShowHeadline" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
               <input type="text" id="editHeadline" placeholder="Bold banner headline">
             </div>
             <div class="field span-2">
-              <label>Subtext</label>
+              <div class="label-row">
+                <label>Subtext</label>
+                <label class="toggle toggle-sm" title="Show in banner">
+                  <input type="checkbox" id="editShowSubtext" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
               <textarea id="editSubtext" rows="2" placeholder="Supporting description text"></textarea>
             </div>
-            <div class="field">
-              <label>CTA Button Text</label>
+            <div class="field span-2">
+              <div class="label-row">
+                <label>CTA Button Text</label>
+                <label class="toggle toggle-sm" title="Show in banner">
+                  <input type="checkbox" id="editShowCta" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
               <input type="text" id="editCta" placeholder="Learn More">
-            </div>
-            <div class="field">
-              <label>Show CTA Button</label>
-              <label class="toggle">
-                <input type="checkbox" id="editShowCta" checked>
-                <span class="toggle-slider"></span>
-              </label>
             </div>
           </div>
         </div>
@@ -161,7 +189,13 @@
               </div>
             </div>
             <div class="field">
-              <label>Overlay Color</label>
+              <div class="label-row">
+                <label>Overlay Color</label>
+                <label class="toggle toggle-sm" title="Enable overlay">
+                  <input type="checkbox" id="editShowOverlay">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
               <div class="color-row">
                 <input type="color" id="editOverlayColor" value="#000000">
                 <input type="text" id="editOverlayColorHex" class="hex-input" value="#000000" maxlength="7">
@@ -270,6 +304,7 @@
           </div>
           <div class="action-right">
             <button id="shuffleBtn" class="btn btn-ghost" title="Try a different layout">&#8634; Shuffle Layout</button>
+            <button id="checkContrastBtn" class="btn btn-ghost" title="Audit and fix text contrast">Check Contrast</button>
             <button id="resetPositionsBtn" class="btn btn-ghost">Reset Positions</button>
             <button id="newBannerBtn" class="btn btn-ghost">New Banner</button>
             <button id="saveBannerBtn" class="btn btn-secondary">Save</button>

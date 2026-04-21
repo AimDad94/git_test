@@ -337,6 +337,24 @@ body {
 .toggle input:checked + .toggle-slider { background: var(--accent); }
 .toggle input:checked + .toggle-slider::after { transform: translateX(16px); }
 
+/* Small toggle variant — used inline next to field labels */
+.toggle.toggle-sm { margin-top: 0; }
+.toggle.toggle-sm .toggle-slider { width: 30px; height: 17px; border-radius: 9px; }
+.toggle.toggle-sm .toggle-slider::after { width: 12px; height: 12px; top: 2.5px; left: 2.5px; }
+.toggle.toggle-sm input:checked + .toggle-slider::after { transform: translateX(13px); }
+
+/* Row that holds a field label with an inline toggle on the right */
+.label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.label-row label:first-child {
+  margin-bottom: 0;
+}
+
 /* ── Main Content ─────────────────────────────────────────────────────────── */
 .main-content {
   display: flex;
