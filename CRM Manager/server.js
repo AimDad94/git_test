@@ -1,12 +1,15 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
+app.use(express.json());
 const PORT = 3001;
 const API_KEY = process.env.API_KEY;
 const API_BASE = 'https://api.voresdigital.dk/data/customers/active';
 const CACHE_TTL_MS = 60_000;
+const DNC_FILE = path.join(__dirname, 'do-not-contact.json');
 
 if (!API_KEY) {
   console.error('Missing API_KEY in .env');
@@ -149,26 +152,74 @@ function rankByContactPriority(customers) {
     .sort((a, b) => b.priority.total - a.priority.total);
 }
 
+function loadDoNotContact() {
+  try {
+    const raw = fs.readFileSync(DNC_FILE, 'utf8');
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveDoNotContact(list) {
+  fs.writeFileSync(DNC_FILE, JSON.stringify(list, null, 2), 'utf8');
+}
+
+function normaliseName(s) {
+  return (s || '').trim().toLowerCase();
+}
+
 app.get('/api/customers', async (_req, res) => {
   try {
     const now = Date.now();
-    if (cache.payload && now - cache.fetchedAt < CACHE_TTL_MS) {
-      return res.json({ ...cache.payload, cached: true });
+    let ranked;
+    let cached = false;
+    if (cache.items && now - cache.fetchedAt < CACHE_TTL_MS) {
+      ranked = cache.items;
+      cached = true;
+    } else {
+      const items = await fetchAll();
+      ranked = rankByContactPriority(items);
+      cache = { fetchedAt: now, items: ranked };
     }
-    const items = await fetchAll();
-    const ranked = rankByContactPriority(items);
-    cache = {
-      fetchedAt: now,
-      payload: {
-        total: ranked.length,
-        fetchedAt: new Date(now).toISOString(),
-        items: ranked
-      }
-    };
-    res.json({ ...cache.payload, cached: false });
+    const dncSet = new Set(loadDoNotContact().map(normaliseName));
+    const flagged = ranked.map(c =>
+      dncSet.has(normaliseName(c.customerName)) ? { ...c, doNotContact: true } : c
+    );
+    res.json({
+      total: flagged.length,
+      excludedCount: flagged.filter(c => c.doNotContact).length,
+      fetchedAt: new Date(cache.fetchedAt).toISOString(),
+      cached,
+      items: flagged
+    });
   } catch (err) {
     res.status(502).json({ error: err.message });
   }
+});
+
+app.get('/api/do-not-contact', (_req, res) => {
+  res.json({ items: loadDoNotContact() });
+});
+
+app.post('/api/do-not-contact', (req, res) => {
+  const name = (req.body && req.body.customerName || '').trim();
+  if (!name) return res.status(400).json({ error: 'customerName required' });
+  const list = loadDoNotContact();
+  if (!list.some(n => normaliseName(n) === normaliseName(name))) {
+    list.push(name);
+    saveDoNotContact(list);
+  }
+  res.json({ items: list });
+});
+
+app.delete('/api/do-not-contact', (req, res) => {
+  const name = (req.body && req.body.customerName || '').trim();
+  if (!name) return res.status(400).json({ error: 'customerName required' });
+  const list = loadDoNotContact().filter(n => normaliseName(n) !== normaliseName(name));
+  saveDoNotContact(list);
+  res.json({ items: list });
 });
 
 app.get('/', (_req, res) => {

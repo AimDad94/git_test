@@ -123,6 +123,26 @@
 
   .state { padding: 40px; text-align: center; color: var(--muted); }
   .state.error { color: var(--danger); }
+
+  .toolbar .toggle { padding: 9px 14px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--card); cursor: pointer; font-size: 13px; font-weight: 500;
+    color: var(--muted); }
+  .toolbar .toggle:hover { background: var(--row-hover); color: var(--text); }
+  .toolbar .toggle.active { background: #eef2ff; color: #4338ca; border-color: #c7d2fe; }
+
+  td.action { width: 32px; text-align: center; padding: 0 8px; }
+  .row-action { opacity: 0; border: none; background: transparent; cursor: pointer;
+    color: var(--muted); font-size: 16px; line-height: 1; padding: 4px 6px;
+    border-radius: 4px; transition: opacity 0.15s, background 0.15s, color 0.15s; }
+  tbody tr:hover .row-action { opacity: 1; }
+  .row-action:hover { background: #fee2e2; color: var(--danger); }
+  .row-action.restore:hover { background: #d1fae5; color: var(--ok); }
+
+  tbody tr.excluded { opacity: 0.55; }
+  tbody tr.excluded .row-action { opacity: 0.8; color: var(--accent); }
+  tbody tr.excluded td.name::after {
+    content: ' · excluded'; color: var(--muted); font-size: 11px; font-weight: 400;
+  }
 </style>
 </head>
 <body>
@@ -134,6 +154,7 @@
   <div class="toolbar">
     <input id="search" type="search" placeholder="Search by customer name or site…">
     <span class="stats" id="stats"></span>
+    <button id="toggleExcluded" class="toggle" title="Show customers excluded from the call list">Excluded <span id="excludedCount">0</span></button>
     <button id="refresh">Refresh</button>
   </div>
   <div class="card">
@@ -150,10 +171,11 @@
           <th class="sortable" data-sort="invoice">Invoice<span class="arrow"></span></th>
           <th class="sortable" data-sort="products">Products<span class="arrow"></span></th>
           <th class="sortable" data-sort="binding">Binding<span class="arrow"></span></th>
+          <th></th>
         </tr>
       </thead>
       <tbody id="tbody">
-        <tr><td colspan="10" class="state">Loading…</td></tr>
+        <tr><td colspan="11" class="state">Loading…</td></tr>
       </tbody>
     </table>
   </div>
@@ -195,9 +217,12 @@
   const stats = document.getElementById('stats');
   const search = document.getElementById('search');
   const refreshBtn = document.getElementById('refresh');
+  const toggleExcludedBtn = document.getElementById('toggleExcluded');
+  const excludedCountEl = document.getElementById('excludedCount');
 
   let all = [];
   let sortState = { key: 'score', dir: 'desc' };
+  let showExcluded = false;
 
   const SAT_RANK = { Red: 3, Yellow: 2, null: 1, Green: 0 };
 
@@ -318,7 +343,7 @@
     const pBars = barsHtml(c.priority.breakdown, WEIGHTS, SIGNAL_LABELS, SIGNAL_TIPS);
     const rBars = c.churnRisk ? barsHtml(c.churnRisk.breakdown, RISK_WEIGHTS, RISK_LABELS, RISK_TIPS) : '';
     return `
-      <tr class="breakdown-row"><td colspan="10">
+      <tr class="breakdown-row"><td colspan="11">
         <div class="breakdown">
           <h4>Priority breakdown — total ${c.priority.total.toFixed(1)} / ${MAX_SCORE}</h4>
           <div class="bars">${pBars}</div>
@@ -331,15 +356,23 @@
     `;
   }
 
+  function actionCell(c) {
+    if (c.doNotContact) {
+      return `<td class="action"><button class="row-action restore" data-action="restore" title="Restore to call list">↺</button></td>`;
+    }
+    return `<td class="action"><button class="row-action" data-action="exclude" title="Exclude from call list">×</button></td>`;
+  }
+
   function render(items) {
     if (!items.length) {
-      tbody.innerHTML = '<tr><td colspan="10" class="state">No customers match.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="11" class="state">No customers match.</td></tr>';
       return;
     }
     tbody.innerHTML = items.map((c, i) => {
       const risk = c.churnRisk ? c.churnRisk.total : 0;
+      const cls = c.doNotContact ? 'excluded' : '';
       return `
-      <tr data-idx="${i}">
+      <tr data-idx="${i}" class="${cls}">
         <td class="rank">${i + 1}</td>
         <td><span class="score ${scoreClass(c.priority.total)}">${c.priority.total.toFixed(0)}</span></td>
         <td><span class="score ${riskClass(risk)}">${risk.toFixed(0)}</span></td>
@@ -350,12 +383,14 @@
         <td>${invoiceCell(c.invoiceStatus)}</td>
         <td class="muted">${(c.products || []).length}</td>
         <td>${bindingCell(c.bindingPeriod)}</td>
+        ${actionCell(c)}
       </tr>
     `;
     }).join('');
 
     tbody.querySelectorAll('tr[data-idx]').forEach(tr => {
-      tr.addEventListener('click', () => {
+      tr.addEventListener('click', e => {
+        if (e.target.closest('.row-action')) return;
         const idx = +tr.dataset.idx;
         const next = tr.nextElementSibling;
         if (next && next.classList.contains('breakdown-row')) {
@@ -371,15 +406,40 @@
         tr.insertAdjacentHTML('afterend', breakdownRow(items[idx]));
       });
     });
+
+    tbody.querySelectorAll('.row-action').forEach(btn => {
+      btn.addEventListener('click', async e => {
+        e.stopPropagation();
+        const tr = btn.closest('tr');
+        const idx = +tr.dataset.idx;
+        const customer = items[idx];
+        const action = btn.dataset.action;
+        const verb = action === 'exclude' ? 'Exclude' : 'Restore';
+        const prep = action === 'exclude' ? 'from' : 'to';
+        if (!confirm(`${verb} "${customer.customerName}" ${prep} the call list?`)) return;
+        try {
+          const res = await fetch('/api/do-not-contact', {
+            method: action === 'exclude' ? 'POST' : 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ customerName: customer.customerName })
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          await load();
+        } catch (err) {
+          alert(`Failed: ${err.message}`);
+        }
+      });
+    });
   }
 
   function applyFilter() {
     const q = search.value.trim().toLowerCase();
+    const scope = showExcluded ? all.filter(c => c.doNotContact) : all.filter(c => !c.doNotContact);
     const base = q
-      ? all.filter(c =>
+      ? scope.filter(c =>
           (c.customerName || '').toLowerCase().includes(q) ||
           (c.sites || []).some(s => s.toLowerCase().includes(q)))
-      : all;
+      : scope;
     render(sortItems(base));
   }
 
@@ -391,19 +451,27 @@
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       all = data.items;
-      const never = all.filter(c => !c.lastCallDate).length;
-      const red = all.filter(c => c.satisfactionScore === 'Red').length;
-      const unpaid = all.filter(c => c.invoiceStatus === 'has_unpaid').length;
-      const highRisk = all.filter(c => c.churnRisk && c.churnRisk.total >= 50).length;
-      stats.textContent = `${data.total} customers · ${never} never called · ${red} red · ${unpaid} unpaid · ${highRisk} high risk`;
+      const active = all.filter(c => !c.doNotContact);
+      const never = active.filter(c => !c.lastCallDate).length;
+      const red = active.filter(c => c.satisfactionScore === 'Red').length;
+      const unpaid = active.filter(c => c.invoiceStatus === 'has_unpaid').length;
+      const highRisk = active.filter(c => c.churnRisk && c.churnRisk.total >= 50).length;
+      stats.textContent = `${active.length} customers · ${never} never called · ${red} red · ${unpaid} unpaid · ${highRisk} high risk`;
+      excludedCountEl.textContent = data.excludedCount || 0;
+      toggleExcludedBtn.style.display = data.excludedCount > 0 || showExcluded ? '' : 'none';
       applyFilter();
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="10" class="state error">Failed to load: ${escape(err.message)}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="11" class="state error">Failed to load: ${escape(err.message)}</td></tr>`;
     }
   }
 
   search.addEventListener('input', applyFilter);
   refreshBtn.addEventListener('click', load);
+  toggleExcludedBtn.addEventListener('click', () => {
+    showExcluded = !showExcluded;
+    toggleExcludedBtn.classList.toggle('active', showExcluded);
+    applyFilter();
+  });
 
   document.querySelectorAll('thead th.sortable').forEach(th => {
     th.addEventListener('click', () => {
