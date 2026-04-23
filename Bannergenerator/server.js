@@ -437,6 +437,53 @@ app.get('/api/image-base64', async (req, res) => {
   }
 });
 
+// Pixabay image search proxy — keeps the API key server-side.
+// Docs: https://pixabay.com/api/docs/
+app.get('/api/pixabay-search', async (req, res) => {
+  const key = process.env.PIXABAY_API_KEY;
+  if (!key) return res.status(500).json({ error: 'PIXABAY_API_KEY not configured' });
+
+  const q = String(req.query.q || '').trim();
+  if (!q) return res.status(400).json({ error: 'q is required' });
+  if (q.length > 100) return res.status(400).json({ error: 'q too long' });
+
+  const page = Math.max(1, Math.min(50, parseInt(req.query.page, 10) || 1));
+  const perPage = Math.max(3, Math.min(50, parseInt(req.query.per_page, 10) || 24));
+  const orientation = ['horizontal', 'vertical', 'all'].includes(req.query.orientation)
+    ? req.query.orientation : 'horizontal';
+
+  const url = 'https://pixabay.com/api/?' + new URLSearchParams({
+    key,
+    q,
+    image_type: 'photo',
+    orientation,
+    safesearch: 'true',
+    per_page: String(perPage),
+    page: String(page),
+  }).toString();
+
+  try {
+    const r = await fetchWithTimeout(url, 10000);
+    if (!r.ok) throw new Error(`Pixabay HTTP ${r.status}`);
+    const data = await r.json();
+    // Only return fields we need — keeps response small and avoids leaking internals.
+    const hits = (data.hits || []).map((h) => ({
+      id: h.id,
+      previewURL: h.previewURL,        // small thumbnail (~150px)
+      webformatURL: h.webformatURL,    // medium (~640px) — good for banner use
+      largeImageURL: h.largeImageURL,  // large (~1280px)
+      imageWidth: h.imageWidth,
+      imageHeight: h.imageHeight,
+      tags: h.tags,
+      user: h.user,
+      pageURL: h.pageURL,
+    }));
+    res.json({ total: data.totalHits || 0, hits });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // List all saved banners
 app.get('/api/banners', async (req, res) => {
   try {

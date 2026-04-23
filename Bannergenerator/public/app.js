@@ -37,13 +37,18 @@ const state = {
   showCompanyName: true,
   showHeadline: true,
   showSubtext: false,
-  showTagline: true,
+  showTagline: false,
   showCta: true,
   // Background
   selectedImageBase64: null,
   imageAvgColor: null,
   imagePixels: [],
   bgColor: '#1a1a2e',
+  // Background image fit: 'cover' (fill+crop), 'contain' (fit whole, may letterbox),
+  // 'fill' (stretch). imagePosX/Y are percentages used by background-position.
+  imageFit: 'cover',
+  imagePosX: 50,
+  imagePosY: 50,
   // Overlay
   showOverlay: false,
   overlayColor: '#000000',
@@ -69,6 +74,14 @@ const state = {
   textAlign: 'center',
   // Element positions
   positions: clonePositions(),
+  // Split/zoned layouts (empty for free-floating styles).
+  // Each entry: { bounds_px:{x,y,w,h}, bg:'image'|'color', color:'#hex'|null,
+  //               textColor:'#hex'|null, elements:[keys], textAlign }
+  zones: [],
+  // Per-element overrides populated when zones are active. Elements not in
+  // these maps fall back to state.primaryColor / state.textAlign.
+  elementColors: {},
+  elementTextAligns: {},
   // Persistence
   currentBannerId: null,
   bannerName: '',
@@ -193,6 +206,61 @@ const DESIGN_STYLES = [
     anchors: { stackX: 0.28, cta: 'flow' },
     vAlign: 'bottom', gap: 0.045, vPad: 0.07,
   },
+
+  /* ── Split / zoned layouts ─────────────────────────────────────────────── */
+  /* Each zone has its own background (image or solid colour) and flows its
+   * assigned elements within its own bounds. Elements not listed in any zone
+   * are hidden. typeScale fractions are still relative to banner height. */
+  {
+    name: 'Top Brand Bar',
+    minAspect: 1.8, maxAspect: 6,
+    textAlign: 'left', headlineWeight: '800', overlayOpacity: 0,
+    cta: { radius: 4, padV: 10, padH: 26, weight: '700' },
+    typeScale: { headline: 0.050, subtext: 0.048, company: 0.17, tagline: 0.036, cta: 0.052 },
+    zones: [
+      { bounds: { x: 0, y: 0, w: 1, h: 0.34 }, bg: 'light', textColor: 'dark',
+        elements: ['companyName', 'tagline'],
+        textAlign: 'left', stackX: 0.05, vAlign: 'center', gap: 0.012, vPad: 0.04 },
+      { bounds: { x: 0, y: 0.34, w: 1, h: 0.66 }, bg: 'image',
+        elements: ['headline', 'subtext', 'cta'],
+        textAlign: 'left', stackX: 0.06, vAlign: 'center', gap: 0.030, vPad: 0.08 },
+    ],
+    anchors: { stackX: 0.5, cta: 'flow' }, vAlign: 'center', gap: 0.05, vPad: 0.08,
+  },
+  {
+    name: 'Side CTA Panel',
+    minAspect: 1.8, maxAspect: 6,
+    textAlign: 'left', headlineWeight: '800', overlayOpacity: 0,
+    cta: { radius: 4, padV: 12, padH: 28, weight: '700' },
+    typeScale: { headline: 0.054, subtext: 0.050, company: 0.13, tagline: 0.036, cta: 0.060 },
+    zones: [
+      { bounds: { x: 0, y: 0, w: 0.68, h: 1 }, bg: 'image',
+        elements: ['companyName', 'headline', 'subtext'],
+        textAlign: 'left', stackX: 0.06, vAlign: 'center', gap: 0.040, vPad: 0.10 },
+      // Use accent (tagline/secondary brand colour) rather than 'brand' so
+      // the CTA button (which uses ctaColor) stays visually distinct.
+      { bounds: { x: 0.68, y: 0, w: 0.32, h: 1 }, bg: 'accent', textColor: 'auto',
+        elements: ['cta', 'tagline'],
+        textAlign: 'center', stackX: 0.5, vAlign: 'center', gap: 0.04, vPad: 0.18 },
+    ],
+    anchors: { stackX: 0.5, cta: 'flow' }, vAlign: 'center', gap: 0.05, vPad: 0.08,
+  },
+  {
+    name: 'Bottom Info Bar',
+    minAspect: 2.0, maxAspect: 6,
+    textAlign: 'left', headlineWeight: '800', overlayOpacity: 0,
+    cta: { radius: 4, padV: 10, padH: 26, weight: '700' },
+    typeScale: { headline: 0.078, subtext: 0.050, company: 0.20, tagline: 0.040, cta: 0.056 },
+    zones: [
+      { bounds: { x: 0, y: 0, w: 1, h: 0.60 }, bg: 'image',
+        elements: ['companyName', 'headline'],
+        textAlign: 'left', stackX: 0.05, vAlign: 'center', gap: 0.030, vPad: 0.10 },
+      { bounds: { x: 0, y: 0.60, w: 1, h: 0.40 }, bg: 'dark', textColor: 'light',
+        elements: ['subtext', 'cta', 'tagline'],
+        textAlign: 'left', stackX: 0.06, vAlign: 'center', gap: 0.020, vPad: 0.10 },
+    ],
+    anchors: { stackX: 0.5, cta: 'flow' }, vAlign: 'center', gap: 0.05, vPad: 0.08,
+  },
 ];
 
 const SLIDER_BOUNDS = {
@@ -211,6 +279,11 @@ const ELEMENT_IDS = {
 };
 
 function isElementVisible(key) {
+  // In zoned layouts, only elements assigned to a zone are shown.
+  if (state.zones && state.zones.length) {
+    const assigned = state.zones.some((z) => z.elements.includes(key));
+    if (!assigned) return false;
+  }
   if (key === 'companyName') return !!state.showCompanyName && !!state.companyName;
   if (key === 'headline')    return !!state.showHeadline    && !!state.headline;
   if (key === 'subtext')     return !!state.showSubtext     && !!state.subtext;
@@ -219,8 +292,35 @@ function isElementVisible(key) {
   return false;
 }
 
+/* Resolve a zone's named bg to concrete {type, color}. */
+function resolveZoneBg(bg) {
+  if (bg === 'image') return { type: 'image', color: null };
+  const namedColors = {
+    brand:     state.ctaColor        || '#6c63ff',
+    accent:    state.secondaryColor  || '#f0c040',
+    primary:   state.primaryColor    || '#ffffff',
+    light:     '#ffffff',
+    dark:      '#1a1a2e',
+    bg:        state.bgColor         || '#1a1a2e',
+  };
+  const color = namedColors[bg] || bg;
+  return { type: 'color', color };
+}
+
+/* Resolve a zone's text colour. 'auto' picks white/black against the bg. */
+function resolveZoneTextColor(textColor, zoneBgColor) {
+  if (!textColor) return null;
+  if (textColor === 'light') return '#ffffff';
+  if (textColor === 'dark')  return '#1a1a2e';
+  if (textColor === 'auto') {
+    if (!zoneBgColor) return null;
+    return relativeLuminance(zoneBgColor) > 0.55 ? '#1a1a2e' : '#ffffff';
+  }
+  return textColor;
+}
+
 let _lastStyleIndex = -1;
-function shuffleLayout() {
+async function shuffleLayout() {
   const { sourceW: w, sourceH: h } = state.format;
   const aspect = w / h;
 
@@ -258,13 +358,185 @@ function shuffleLayout() {
     ctaPaddingH:     style.cta.padH,
   });
 
-  // Render once so we can measure real heights
+  // Compute zones (if any) up-front so renderPreview can draw zone bgs and
+  // isElementVisible correctly filters out unassigned elements.
+  if (style.zones) {
+    const zones = style.zones.map((z) => {
+      const bg = resolveZoneBg(z.bg);
+      return {
+        bounds_px: {
+          x: Math.round(z.bounds.x * w),
+          y: Math.round(z.bounds.y * h),
+          w: Math.round(z.bounds.w * w),
+          h: Math.round(z.bounds.h * h),
+        },
+        bg: bg.type,
+        color: bg.color,
+        textColor: resolveZoneTextColor(z.textColor, bg.color),
+        elements: z.elements.slice(),
+        textAlign: z.textAlign || style.textAlign,
+      };
+    });
+    state.zones = zones;
+    state.elementColors = {};
+    state.elementTextAligns = {};
+    zones.forEach((z) => {
+      z.elements.forEach((k) => {
+        if (z.textColor) state.elementColors[k] = z.textColor;
+        state.elementTextAligns[k] = z.textAlign;
+      });
+    });
+  } else {
+    state.zones = [];
+    state.elementColors = {};
+    state.elementTextAligns = {};
+  }
+
+  // Render once so the DOM reflects the new font sizes / families
   populateEditors();
   renderPreview();
-  flowStack(style, w, h);
+
+  // Critical: wait for any just-requested web fonts to finish loading before
+  // measuring offsetHeight. Otherwise flowStack sees fallback-font metrics
+  // and the positions we snapshot won't match the final rendered layout.
+  await waitForFontsReady();
+
+  if (style.zones) {
+    style.zones.forEach((zCfg, i) => {
+      const z = state.zones[i];
+      flowZone(z.elements, z.bounds_px, {
+        stackX: zCfg.stackX,
+        vAlign: zCfg.vAlign,
+        gap:    zCfg.gap,
+        vPad:   zCfg.vPad,
+      });
+    });
+  } else {
+    flowStack(style, w, h);
+  }
   renderPreview();
 
   showToast(`Layout: ${style.name}`);
+}
+
+async function waitForFontsReady() {
+  await new Promise((r) => requestAnimationFrame(r));
+  if (document.fonts && document.fonts.ready) {
+    try { await document.fonts.ready; } catch (_) { /* ignore */ }
+  }
+  await new Promise((r) => requestAnimationFrame(r));
+}
+
+/* ── Variant picker ──────────────────────────────────────────────────────── */
+
+// State keys captured per variant (layout + typography — NOT colours/image)
+const VARIANT_KEYS = [
+  'textAlign', 'headlineWeight', 'overlayOpacity',
+  'headlineSize', 'subtextSize', 'companySize', 'taglineSize',
+  'ctaFontSize', 'ctaFontWeight', 'ctaBorderRadius', 'ctaPaddingV', 'ctaPaddingH',
+];
+
+function snapshotVariant() {
+  const snap = {
+    positions: clonePositions(state.positions),
+    zones:             JSON.parse(JSON.stringify(state.zones || [])),
+    elementColors:     { ...(state.elementColors || {}) },
+    elementTextAligns: { ...(state.elementTextAligns || {}) },
+  };
+  for (const k of VARIANT_KEYS) snap[k] = state[k];
+  return snap;
+}
+
+function applyVariant(snap) {
+  for (const k of VARIANT_KEYS) state[k] = snap[k];
+  state.positions         = JSON.parse(JSON.stringify(snap.positions));
+  state.zones             = JSON.parse(JSON.stringify(snap.zones || []));
+  state.elementColors     = { ...(snap.elementColors || {}) };
+  state.elementTextAligns = { ...(snap.elementTextAligns || {}) };
+  populateEditors();
+  renderPreview();
+}
+
+async function captureBannerThumbnail() {
+  const preview = $('bannerPreview');
+  const fmt = state.format;
+  const outer = preview.parentElement;
+
+  const savedTransform = preview.style.transform;
+  const savedOuterW = outer.style.width;
+  const savedOuterH = outer.style.height;
+  const savedOuterOverflow = outer.style.overflow;
+  preview.style.transform = '';
+  outer.style.width  = fmt.sourceW + 'px';
+  outer.style.height = fmt.sourceH + 'px';
+  outer.style.overflow = 'visible';
+  await new Promise((r) => requestAnimationFrame(r));
+
+  try {
+    const canvas = await html2canvas(preview, {
+      width: fmt.sourceW,
+      height: fmt.sourceH,
+      scale: 0.4,
+      logging: false,
+      useCORS: true,
+      backgroundColor: state.bgColor,
+    });
+    return canvas.toDataURL('image/png');
+  } finally {
+    preview.style.transform = savedTransform;
+    outer.style.width  = savedOuterW;
+    outer.style.height = savedOuterH;
+    outer.style.overflow = savedOuterOverflow;
+  }
+}
+
+let _generatingVariants = false;
+async function showVariantPicker(count = 4) {
+  if (_generatingVariants) return;
+  _generatingVariants = true;
+  const panel = $('variantPanel');
+  const grid = $('variantGrid');
+  panel.classList.remove('hidden');
+  grid.innerHTML = '<p class="empty-hint">Genererer varianter…</p>';
+
+  const snapshots = [];
+  const thumbs = [];
+  try {
+    // Ensure the body font is fully loaded before the first shuffle so
+    // offsetHeight measurements aren't poisoned by a fallback-font render.
+    await waitForFontsReady();
+    for (let i = 0; i < count; i++) {
+      await shuffleLayout();
+      // Extra settle pass: guarantees the DOM has reflected the newly
+      // computed positions before we snapshot + capture.
+      await waitForFontsReady();
+      snapshots.push(snapshotVariant());
+      thumbs.push(await captureBannerThumbnail());
+    }
+    // Leave variant 0 applied as the active choice
+    applyVariant(snapshots[0]);
+    renderVariantGrid(snapshots, thumbs, 0);
+  } finally {
+    _generatingVariants = false;
+  }
+}
+
+function renderVariantGrid(snapshots, thumbs, activeIndex = 0) {
+  const grid = $('variantGrid');
+  grid.innerHTML = '';
+  snapshots.forEach((snap, i) => {
+    const card = document.createElement('button');
+    card.className = 'variant-card' + (i === activeIndex ? ' selected' : '');
+    card.type = 'button';
+    card.innerHTML = `<img src="${thumbs[i]}" alt="Variant ${i + 1}">`;
+    card.addEventListener('click', () => {
+      applyVariant(snap);
+      document.querySelectorAll('.variant-card').forEach((el, j) => {
+        el.classList.toggle('selected', j === i);
+      });
+    });
+    grid.appendChild(card);
+  });
 }
 
 /*
@@ -347,6 +619,72 @@ function flowStack(style, w, h) {
   state.positions = positions;
 }
 
+/* flowZone — like flowStack but constrains elements to a zone rectangle.
+ * Used by split-layout styles. The key difference: stackX/vAlign/gap/vPad
+ * are interpreted relative to the zone's own bounds, not the whole banner. */
+function flowZone(keys, zone, opts) {
+  const { x: zx, y: zy, w: zw, h: zh } = zone;
+  const elKeys = keys.filter(isElementVisible);
+  if (!elKeys.length) return;
+
+  // Preserve STACK_ORDER within the zone
+  const stackKeys = STACK_ORDER.filter((k) => elKeys.includes(k));
+
+  const gapPx   = Math.max(4, Math.round(zh * (opts.gap  ?? 0.04)));
+  const vPadPx  = Math.round(zh * (opts.vPad ?? 0.08));
+  const available = Math.max(zh * 0.4, zh - 2 * vPadPx);
+
+  let heights = stackKeys.map((k) => $(ELEMENT_IDS[k]).offsetHeight || 0);
+  let totalH  = heights.reduce((a, b) => a + b, 0) + gapPx * Math.max(0, stackKeys.length - 1);
+
+  // Shrink font sizes of elements in this zone if they overflow
+  if (totalH > available && stackKeys.length > 0) {
+    const gapsTotal = gapPx * Math.max(0, stackKeys.length - 1);
+    const budget = Math.max(1, available - gapsTotal);
+    const currentText = Math.max(1, totalH - gapsTotal);
+    const scale = Math.max(0.4, budget / currentText);
+    const keyToSizeKey = {
+      companyName: 'companySize',
+      headline:    'headlineSize',
+      subtext:     'subtextSize',
+      tagline:     'taglineSize',
+      cta:         'ctaFontSize',
+    };
+    const shrink = (val, sk) => {
+      const [min, max] = SLIDER_BOUNDS[sk];
+      return Math.round(clamp(val * scale, min, max));
+    };
+    stackKeys.forEach((k) => {
+      const sk = keyToSizeKey[k];
+      if (sk) state[sk] = shrink(state[sk], sk);
+      if (k === 'cta') state.ctaPaddingV = Math.max(4, Math.round(state.ctaPaddingV * scale));
+    });
+    populateEditors();
+    renderPreview();
+    heights = stackKeys.map((k) => $(ELEMENT_IDS[k]).offsetHeight || 0);
+    totalH  = heights.reduce((a, b) => a + b, 0) + gapPx * Math.max(0, stackKeys.length - 1);
+  }
+
+  let startY;
+  if (opts.vAlign === 'top')         startY = zy + vPadPx;
+  else if (opts.vAlign === 'bottom') startY = zy + Math.max(vPadPx, zh - vPadPx - totalH);
+  else                               startY = zy + Math.max(vPadPx, (zh - totalH) / 2);
+
+  const stackX = Math.round(zx + zw * (opts.stackX ?? 0.5));
+  const positions = { ...state.positions };
+  let cursor = startY;
+  stackKeys.forEach((k, i) => {
+    positions[k] = { x: stackX, y: Math.round(cursor + heights[i] / 2) };
+    cursor += heights[i] + gapPx;
+  });
+
+  // Keep unrelated elements' positions untouched
+  for (const k of Object.keys(DEFAULT_POSITIONS)) {
+    if (!positions[k]) positions[k] = state.positions[k] || DEFAULT_POSITIONS[k];
+  }
+  state.positions = positions;
+}
+
 /* ── Format helpers ──────────────────────────────────────────────────────── */
 function computePreviewScale(fmt) {
   const main = document.querySelector('.main-content');
@@ -366,6 +704,20 @@ function scalePositions(positions, fromW, fromH, toW, toH) {
 function applyFormat(fmt) {
   const prev = state.format;
   state.positions = scalePositions(state.positions, prev.sourceW, prev.sourceH, fmt.sourceW, fmt.sourceH);
+  // Rescale zone pixel bounds to the new format
+  if (state.zones && state.zones.length) {
+    const sx = fmt.sourceW / prev.sourceW;
+    const sy = fmt.sourceH / prev.sourceH;
+    state.zones = state.zones.map((z) => ({
+      ...z,
+      bounds_px: {
+        x: Math.round(z.bounds_px.x * sx),
+        y: Math.round(z.bounds_px.y * sy),
+        w: Math.round(z.bounds_px.w * sx),
+        h: Math.round(z.bounds_px.h * sy),
+      },
+    }));
+  }
   state.format = fmt;
   state.previewScale = computePreviewScale(fmt);
 
@@ -380,6 +732,43 @@ function applyFormat(fmt) {
   outer.style.height = Math.round(fmt.sourceH * state.previewScale) + 'px';
 
   renderPreview();
+}
+
+/* Render (or clear) zone background divs inside bannerPreview. Zones with
+ * bg: 'image' are skipped — the preview's own background photo shows through. */
+function renderZones(preview) {
+  // Remove previously rendered zone divs
+  preview.querySelectorAll('.banner-zone').forEach((el) => el.remove());
+  if (!state.zones || !state.zones.length) return;
+
+  const frag = document.createDocumentFragment();
+  state.zones.forEach((z, i) => {
+    const div = document.createElement('div');
+    div.className = 'banner-zone';
+    div.dataset.zoneIndex = String(i);
+    div.style.left   = z.bounds_px.x + 'px';
+    div.style.top    = z.bounds_px.y + 'px';
+    div.style.width  = z.bounds_px.w + 'px';
+    div.style.height = z.bounds_px.h + 'px';
+    if (z.bg === 'color') {
+      div.style.backgroundColor = z.color;
+    } else {
+      // Image zone — let the preview's photo show through
+      div.style.backgroundColor = 'transparent';
+    }
+    frag.appendChild(div);
+  });
+  // Insert at the beginning so overlay (z:1) and text (z:2) stack above
+  preview.insertBefore(frag, preview.firstChild);
+}
+
+/* Resolve effective text colour / alignment for an element, honouring zone
+ * overrides when the current style is zoned. */
+function effectiveTextColor(key, fallback) {
+  return (state.elementColors && state.elementColors[key]) || fallback;
+}
+function effectiveTextAlign(key) {
+  return (state.elementTextAligns && state.elementTextAligns[key]) || state.textAlign;
 }
 
 /* ── Render ──────────────────────────────────────────────────────────────── */
@@ -404,9 +793,19 @@ function renderPreview() {
   preview.style.backgroundImage = state.selectedImageBase64
     ? `url(${state.selectedImageBase64})` : 'none';
   preview.style.backgroundColor = state.bgColor;
+  preview.style.backgroundRepeat = 'no-repeat';
+  preview.style.backgroundSize = state.imageFit === 'fill'
+    ? '100% 100%'
+    : (state.imageFit || 'cover');
+  preview.style.backgroundPosition = `${state.imagePosX ?? 50}% ${state.imagePosY ?? 50}%`;
+  preview.classList.toggle('bg-draggable', !!state.selectedImageBase64 && state.imageFit === 'cover');
 
-  // Overlay
-  if (state.showOverlay) {
+  // Zones (split layouts) — render before overlay so text (z:2) stays on top.
+  renderZones(preview);
+
+  // Overlay — zoned layouts handle contrast per-zone, so skip the global overlay.
+  const zoned = state.zones && state.zones.length > 0;
+  if (state.showOverlay && !zoned) {
     const { r, g, b } = hexToRgb(state.overlayColor);
     overlay.style.backgroundColor = `rgba(${r},${g},${b},${state.overlayOpacity})`;
   } else {
@@ -416,37 +815,56 @@ function renderPreview() {
   // ── Position + style each draggable element ──────────────────────────────
   const pos = state.positions;
 
+
   // Company name
   const company = $('previewCompanyName');
   company.textContent = state.companyName;
-  company.style.color = state.primaryColor;
+  const companyColor = effectiveTextColor('companyName', state.primaryColor);
+  company.style.color = companyColor;
   company.style.fontSize = state.companySize + 'px';
   company.style.fontFamily = headlineFontStack || '';
   company.style.left = pos.companyName.x + 'px';
   company.style.top  = pos.companyName.y + 'px';
-  company.style.textAlign = state.textAlign;
+  company.style.textAlign = effectiveTextAlign('companyName');
+  company.style.background = '';
+  company.style.padding = '';
+  company.style.borderRadius = '';
+  company.style.boxShadow = '';
+  company.style.textShadow = textGlyphShadow(companyColor);
   company.style.display = isElementVisible('companyName') ? '' : 'none';
 
   // Headline
   const headline = $('previewHeadline');
   headline.textContent = state.headline;
-  headline.style.color = state.primaryColor;
+  const headlineColor = effectiveTextColor('headline', state.primaryColor);
+  headline.style.color = headlineColor;
   headline.style.fontSize = state.headlineSize + 'px';
   headline.style.fontWeight = state.headlineWeight;
   headline.style.fontFamily = headlineFontStack || '';
   headline.style.left = pos.headline.x + 'px';
   headline.style.top  = pos.headline.y + 'px';
-  headline.style.textAlign = state.textAlign;
+  headline.style.textAlign = effectiveTextAlign('headline');
+  headline.style.background = '';
+  headline.style.padding = '';
+  headline.style.borderRadius = '';
+  headline.style.boxShadow = '';
+  headline.style.textShadow = textGlyphShadow(headlineColor);
   headline.style.display = isElementVisible('headline') ? '' : 'none';
 
   // Subtext
   const subtext = $('previewSubtext');
   subtext.textContent = state.subtext;
-  subtext.style.color = state.primaryColor;
+  const subtextColor = effectiveTextColor('subtext', state.primaryColor);
+  subtext.style.color = subtextColor;
   subtext.style.fontSize = state.subtextSize + 'px';
   subtext.style.left = pos.subtext.x + 'px';
   subtext.style.top  = pos.subtext.y + 'px';
-  subtext.style.textAlign = state.textAlign;
+  subtext.style.textAlign = effectiveTextAlign('subtext');
+  subtext.style.background = '';
+  subtext.style.padding = '';
+  subtext.style.borderRadius = '';
+  subtext.style.boxShadow = '';
+  subtext.style.textShadow = textGlyphShadow(subtextColor);
   subtext.style.display = isElementVisible('subtext') ? '' : 'none';
 
   // CTA
@@ -465,56 +883,97 @@ function renderPreview() {
   // Tagline
   const tagline = $('previewTagline');
   tagline.textContent = state.tagline;
-  tagline.style.color = state.secondaryColor;
+  const taglineColor = effectiveTextColor('tagline', state.secondaryColor);
+  tagline.style.color = taglineColor;
   tagline.style.fontSize = state.taglineSize + 'px';
   tagline.style.left = pos.tagline.x + 'px';
   tagline.style.top  = pos.tagline.y + 'px';
-  tagline.style.textAlign = state.textAlign;
+  tagline.style.textAlign = effectiveTextAlign('tagline');
+  tagline.style.background = '';
+  tagline.style.padding = '';
+  tagline.style.borderRadius = '';
+  tagline.style.boxShadow = '';
+  tagline.style.textShadow = textGlyphShadow(taglineColor);
   tagline.style.display = isElementVisible('tagline') ? '' : 'none';
 }
 
 /* ── Drag to reposition ──────────────────────────────────────────────────── */
-const drag = { active: false, key: null, offsetX: 0, offsetY: 0 };
+const drag = { active: false, key: null, offsetX: 0, offsetY: 0, mode: null, startX: 0, startY: 0, startPosX: 50, startPosY: 50 };
 
 function initDragging() {
   const preview = $('bannerPreview');
 
   preview.addEventListener('mousedown', (e) => {
     const el = e.target.closest('.banner-el');
-    if (!el) return;
-    e.preventDefault();
+    if (el) {
+      e.preventDefault();
 
-    const key = el.dataset.element;
-    const rect = preview.getBoundingClientRect();
-    const pos = state.positions[key];
+      const key = el.dataset.element;
+      const rect = preview.getBoundingClientRect();
+      const pos = state.positions[key];
 
-    drag.active  = true;
-    drag.key     = key;
-    drag.offsetX = (e.clientX - rect.left) / state.previewScale - pos.x;
-    drag.offsetY = (e.clientY - rect.top)  / state.previewScale - pos.y;
+      drag.active  = true;
+      drag.mode    = 'element';
+      drag.key     = key;
+      drag.offsetX = (e.clientX - rect.left) / state.previewScale - pos.x;
+      drag.offsetY = (e.clientY - rect.top)  / state.previewScale - pos.y;
 
-    el.classList.add('is-dragging');
-    preview.classList.add('is-dragging');
+      el.classList.add('is-dragging');
+      preview.classList.add('is-dragging');
+      return;
+    }
+
+    // Background drag — only meaningful in 'cover' mode (where image is cropped).
+    if (state.selectedImageBase64 && state.imageFit === 'cover') {
+      e.preventDefault();
+      const rect = preview.getBoundingClientRect();
+      drag.active   = true;
+      drag.mode     = 'bg';
+      drag.key      = null;
+      drag.startX   = e.clientX;
+      drag.startY   = e.clientY;
+      drag.startPosX = state.imagePosX ?? 50;
+      drag.startPosY = state.imagePosY ?? 50;
+      drag._rectW = rect.width;
+      drag._rectH = rect.height;
+      preview.classList.add('bg-dragging');
+    }
   });
 
   document.addEventListener('mousemove', (e) => {
     if (!drag.active) return;
 
-    const rect = $('bannerPreview').getBoundingClientRect();
-    const x = clamp((e.clientX - rect.left) / state.previewScale - drag.offsetX, 0, state.format.sourceW);
-    const y = clamp((e.clientY - rect.top)  / state.previewScale - drag.offsetY, 0, state.format.sourceH);
+    if (drag.mode === 'element') {
+      const rect = $('bannerPreview').getBoundingClientRect();
+      const x = clamp((e.clientX - rect.left) / state.previewScale - drag.offsetX, 0, state.format.sourceW);
+      const y = clamp((e.clientY - rect.top)  / state.previewScale - drag.offsetY, 0, state.format.sourceH);
 
-    state.positions[drag.key] = { x, y };
-    renderPreview();
+      state.positions[drag.key] = { x, y };
+      renderPreview();
+    } else if (drag.mode === 'bg') {
+      // Invert delta: dragging right should reveal what's to the right,
+      // i.e. move background-position toward 0% (left edge of image).
+      const dxPct = ((e.clientX - drag.startX) / drag._rectW) * 100;
+      const dyPct = ((e.clientY - drag.startY) / drag._rectH) * 100;
+      state.imagePosX = clamp(drag.startPosX - dxPct, 0, 100);
+      state.imagePosY = clamp(drag.startPosY - dyPct, 0, 100);
+      renderPreview();
+    }
   });
 
   document.addEventListener('mouseup', () => {
     if (!drag.active) return;
-    document.querySelector(`[data-element="${drag.key}"]`)
-      ?.classList.remove('is-dragging');
-    $('bannerPreview').classList.remove('is-dragging');
+    const preview = $('bannerPreview');
+    if (drag.mode === 'element') {
+      document.querySelector(`[data-element="${drag.key}"]`)
+        ?.classList.remove('is-dragging');
+      preview.classList.remove('is-dragging');
+    } else if (drag.mode === 'bg') {
+      preview.classList.remove('bg-dragging');
+    }
     drag.active = false;
     drag.key    = null;
+    drag.mode   = null;
   });
 }
 
@@ -630,6 +1089,14 @@ function populateEditors() {
   $('ctaPaddingHValue').textContent  = state.ctaPaddingH + 'px';
 
   $('bannerName').value = state.bannerName || state.companyName || '';
+  syncFitButtons();
+}
+
+function syncFitButtons() {
+  const current = state.imageFit || 'cover';
+  document.querySelectorAll('#imageFitControls .btn-fit').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.fit === current);
+  });
 }
 
 /* ── Analyze ─────────────────────────────────────────────────────────────── */
@@ -682,15 +1149,21 @@ async function handleAnalyze(e) {
       showCompanyName: true,
       showHeadline:    true,
       showSubtext:     false,
-      showTagline:     true,
+      showTagline:     false,
       showCta:         true,
       showOverlay:     false,
       selectedImageBase64: null,
       imageAvgColor:   null,
       imagePixels:     [],
+      imageFit:        'cover',
+      imagePosX:       50,
+      imagePosY:       50,
       currentBannerId: null,
       bannerName:     analysis.companyName || '',
       positions:      scalePositions(clonePositions(), FORMATS[0].sourceW, FORMATS[0].sourceH, state.format.sourceW, state.format.sourceH),
+      zones:          [],
+      elementColors:  {},
+      elementTextAligns: {},
     });
 
     // Server already prepends the manually entered image URL; just ensure
@@ -709,9 +1182,18 @@ async function handleAnalyze(e) {
     renderImageGrid(images);
 
     $('imagePanel').classList.remove('hidden');
+    $('editorPanel').classList.add('hidden');            // hide full editor — user enters via "Tilpas"
+    $('variantPanel').classList.add('hidden');           // will be shown by showVariantPicker
+    state._pendingVariants = true;
 
     // Auto-select the first image (manual URL takes priority if provided)
     if (images.length > 0) selectImage(images[0]);
+    else {
+      // No image → still show variants against solid bg
+      $('quickActions').classList.remove('hidden');
+      state._pendingVariants = false;
+      showVariantPicker(4);
+    }
   } catch (err) {
     showError(err.message);
   } finally {
@@ -735,6 +1217,58 @@ function renderImageGrid(imageUrls) {
   });
 }
 
+/* ── Pixabay search ──────────────────────────────────────────────────────── */
+async function runPixabaySearch() {
+  const q = $('pixabayQuery').value.trim();
+  const results = $('pixabayResults');
+  const credit = $('pixabayCredit');
+  if (!q) { results.innerHTML = ''; credit.style.display = 'none'; return; }
+
+  // Pick orientation based on current banner format's aspect ratio
+  const fmt = state.format;
+  const aspect = fmt.sourceW / fmt.sourceH;
+  const orientation = aspect > 1.2 ? 'horizontal' : aspect < 0.9 ? 'vertical' : 'all';
+
+  results.innerHTML = '<p class="empty-hint">Søger…</p>';
+  try {
+    const url = `/api/pixabay-search?q=${encodeURIComponent(q)}&orientation=${orientation}&per_page=24`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Search failed');
+
+    if (!data.hits.length) {
+      results.innerHTML = '<p class="empty-hint">Ingen resultater</p>';
+      credit.style.display = 'none';
+      return;
+    }
+
+    results.innerHTML = '';
+    data.hits.forEach((hit) => {
+      const img = document.createElement('img');
+      img.src = hit.previewURL;
+      img.className = 'image-thumb';
+      img.alt = hit.tags || '';
+      img.title = `${hit.tags} — by ${hit.user}`;
+      img.loading = 'lazy';
+      // Use webformatURL for actual banner — previewURL is only ~150px.
+      img.addEventListener('click', () => {
+        const url = hit.webformatURL;
+        if (!state.images.some((i) => i.url === url)) {
+          state.images.push({ url, base64: null });
+          renderImageGrid([...state.images.map((i) => i.url)]);
+        }
+        selectImage(url);
+      });
+      img.addEventListener('error', () => img.style.display = 'none');
+      results.appendChild(img);
+    });
+    credit.style.display = '';
+  } catch (err) {
+    results.innerHTML = `<p class="empty-hint">Fejl: ${err.message}</p>`;
+    credit.style.display = 'none';
+  }
+}
+
 async function selectImage(url) {
   // Highlight selected thumbnail
   document.querySelectorAll('.image-thumb').forEach((el) => {
@@ -750,6 +1284,11 @@ async function selectImage(url) {
     populateEditors();
     renderPreview();
     if (changes.length) showToast(`Adjusted ${changes.join(' & ')} colour for readability`);
+    $('quickActions').classList.remove('hidden');
+    if (state._pendingVariants) {
+      state._pendingVariants = false;
+      showVariantPicker(4);
+    }
   };
 
   // Check cache
@@ -813,8 +1352,14 @@ async function handleSave() {
     ctaPaddingH: state.ctaPaddingH,
     ctaFontWeight: state.ctaFontWeight,
     selectedImageBase64: state.selectedImageBase64,
+    imageFit: state.imageFit,
+    imagePosX: state.imagePosX,
+    imagePosY: state.imagePosY,
     imageUrls: state.images.map((i) => i.url),
     positions: state.positions,
+    zones: state.zones,
+    elementColors: state.elementColors,
+    elementTextAligns: state.elementTextAligns,
   };
 
   try {
@@ -996,10 +1541,16 @@ function loadBanner(b) {
     selectedImageBase64: b.selectedImageBase64 || null,
     imageAvgColor:       null,
     imagePixels:         [],
+    imageFit:            b.imageFit   || 'cover',
+    imagePosX:           b.imagePosX ?? 50,
+    imagePosY:           b.imagePosY ?? 50,
     images:              (b.imageUrls || []).map((url) => ({ url, base64: null })),
     currentBannerId:     b.id,
     bannerName:          b.name || b.companyName || '',
     positions:           clonePositions(b.positions),
+    zones:               b.zones             ? JSON.parse(JSON.stringify(b.zones))             : [],
+    elementColors:       b.elementColors     ? { ...b.elementColors }     : {},
+    elementTextAligns:   b.elementTextAligns ? { ...b.elementTextAligns } : {},
   });
 
   // If saved banner had images, populate grid too
@@ -1010,6 +1561,10 @@ function loadBanner(b) {
 
   populateEditors();
   renderPreview();
+
+  // Saved banners keep their layout — skip variant picker, show quick actions + editor
+  $('quickActions').classList.remove('hidden');
+  $('variantPanel').classList.add('hidden');
 
   // Re-sample image pixels so contrast helpers have fresh data after load
   if (state.selectedImageBase64) {
@@ -1046,11 +1601,14 @@ function resetBanner() {
     showCompanyName: true,
     showHeadline: true,
     showSubtext: false,
-    showTagline: true,
+    showTagline: false,
     showCta: true,
     selectedImageBase64: null,
     imageAvgColor: null,
     imagePixels: [],
+    imageFit: 'cover',
+    imagePosX: 50,
+    imagePosY: 50,
     bgColor: '#1a1a2e',
     showOverlay: false,
     overlayColor: '#000000',
@@ -1074,11 +1632,17 @@ function resetBanner() {
     currentBannerId: null,
     bannerName: '',
     positions: scalePositions(clonePositions(), FORMATS[0].sourceW, FORMATS[0].sourceH, state.format.sourceW, state.format.sourceH),
+    zones: [],
+    elementColors: {},
+    elementTextAligns: {},
   });
   populateEditors();
   renderPreview();
   $('imageGrid').innerHTML = '';
   $('imagePanel').classList.add('hidden');
+  $('variantPanel').classList.add('hidden');
+  $('quickActions').classList.add('hidden');
+  $('editorPanel').classList.add('hidden');
   $('bannerName').value = '';
 }
 
@@ -1176,6 +1740,21 @@ function relativeLuminance(hex) {
     return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
   };
   return 0.2126 * toLin(r) + 0.7152 * toLin(g) + 0.0722 * toLin(b);
+}
+
+/* Text-shadow applied directly to the glyphs — a strong contrasting colour
+ * behind each letter so the text pops. Dark text gets a light halo around
+ * the glyphs, light text gets a dark halo. Layered for a thick, even glow. */
+function textGlyphShadow(hex) {
+  const isDark = relativeLuminance(hex) < 0.5;
+  const c = isDark ? '255,255,255' : '0,0,0';
+  // Multiple layered shadows → thicker, more uniform halo around glyphs
+  return [
+    `0 0 2px rgba(${c},0.95)`,
+    `0 0 4px rgba(${c},0.85)`,
+    `0 0 8px rgba(${c},0.75)`,
+    `0 0 14px rgba(${c},0.60)`,
+  ].join(', ');
 }
 
 /* WCAG contrast ratio between two hex colours (1–21) */
@@ -1503,6 +2082,12 @@ function init() {
     $('customImageUrl').value = '';
   });
 
+  // Pixabay search
+  $('pixabaySearchBtn').addEventListener('click', runPixabaySearch);
+  $('pixabayQuery').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); runPixabaySearch(); }
+  });
+
   // Action buttons
   $('saveBannerBtn').addEventListener('click', handleSave);
   $('downloadBtn').addEventListener('click', handleDownload);
@@ -1513,6 +2098,16 @@ function init() {
   });
   $('shuffleBtn').addEventListener('click', shuffleLayout);
 
+  // Tweak toggle — show/hide the full editor panel
+  $('tweakBannerBtn')?.addEventListener('click', () => {
+    const panel = $('editorPanel');
+    const hidden = panel.classList.toggle('hidden');
+    $('tweakBannerBtn').textContent = hidden ? 'Tilpas banner' : 'Skjul redigering';
+  });
+
+  // Regenerate variants button
+  $('regenerateVariantsBtn')?.addEventListener('click', () => showVariantPicker(4));
+
   // Format selector
   $('formatSelect').addEventListener('change', (e) => {
     applyFormat(FORMATS[parseInt(e.target.value, 10)]);
@@ -1520,6 +2115,21 @@ function init() {
 
   // Drag to reposition
   initDragging();
+
+  // Background image fit buttons
+  document.querySelectorAll('#imageFitControls .btn-fit').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.imageFit = btn.dataset.fit;
+      if (state.imageFit !== 'cover') {
+        // Re-centre when leaving drag-capable mode so we don't lock an offset.
+        state.imagePosX = 50;
+        state.imagePosY = 50;
+      }
+      syncFitButtons();
+      renderPreview();
+    });
+  });
+  syncFitButtons();
 
   // Saved banners — event delegation
   $('savedBannersList').addEventListener('click', handleSavedItemClick);

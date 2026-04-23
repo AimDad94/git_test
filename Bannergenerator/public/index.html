@@ -58,6 +58,17 @@
             <button id="useCustomImageBtn" class="btn btn-sm">Use</button>
           </div>
         </div>
+        <div class="field" style="margin-top:14px">
+          <label for="pixabayQuery">Or search Pixabay</label>
+          <div class="input-row">
+            <input type="text" id="pixabayQuery" placeholder="f.eks. office, forest, city…">
+            <button id="pixabaySearchBtn" class="btn btn-sm">Søg</button>
+          </div>
+          <div id="pixabayResults" class="image-grid" style="margin-top:8px"></div>
+          <p id="pixabayCredit" class="panel-hint" style="margin-top:6px;display:none">
+            Billeder via <a href="https://pixabay.com/" target="_blank" rel="noopener">Pixabay</a>
+          </p>
+        </div>
       </section>
 
       <!-- Saved Banners -->
@@ -98,8 +109,25 @@
         </div>
       </div>
 
+      <!-- Variant Picker (auto-generated layout options after analysis) -->
+      <section id="variantPanel" class="variant-panel hidden">
+        <div class="variant-header">
+          <h2 class="variant-title">Vælg en variant</h2>
+          <button id="regenerateVariantsBtn" class="btn btn-ghost btn-sm" title="Generér nye varianter">&#8634; Ny udgave</button>
+        </div>
+        <div id="variantGrid" class="variant-grid"></div>
+      </section>
+
+      <!-- Primary actions (always visible once a banner exists) -->
+      <div id="quickActions" class="quick-actions hidden">
+        <input type="text" id="bannerName" class="banner-name-input" placeholder="Banner name...">
+        <button id="tweakBannerBtn" class="btn btn-ghost">Tilpas banner</button>
+        <button id="saveBannerBtn" class="btn btn-secondary">Save</button>
+        <button id="downloadBtn" class="btn btn-primary">Download PNG</button>
+      </div>
+
       <!-- Editor Panel (shown after analysis or when loading a saved banner) -->
-      <div id="editorPanel" class="editor-panel">
+      <div id="editorPanel" class="editor-panel hidden">
 
         <!-- Tab bar -->
         <div class="tabs">
@@ -213,6 +241,17 @@
               </div>
             </div>
 
+            <!-- Background image fit -->
+            <div class="field span-3">
+              <label>Background Image Fit</label>
+              <div class="fit-mode-row" id="imageFitControls">
+                <button type="button" class="btn-fit" data-fit="cover"   title="Fill banner, crop to fit">Fill / Crop</button>
+                <button type="button" class="btn-fit" data-fit="contain" title="Show whole image, fill gaps with bg colour">Fit Whole</button>
+                <button type="button" class="btn-fit" data-fit="fill"    title="Stretch image to banner (may distort)">Stretch</button>
+                <span class="fit-hint">Træk i baggrunden for at flytte billedet i Fill-mode</span>
+              </div>
+            </div>
+
             <!-- CTA Button formatting -->
             <div class="field span-3 section-divider">
               <span class="section-label">CTA Button Style</span>
@@ -297,18 +336,13 @@
           </div>
         </div>
 
-        <!-- Action Buttons -->
+        <!-- Advanced actions (inside Tilpas) -->
         <div class="action-bar">
-          <div class="action-left">
-            <input type="text" id="bannerName" class="banner-name-input" placeholder="Banner name...">
-          </div>
           <div class="action-right">
             <button id="shuffleBtn" class="btn btn-ghost" title="Try a different layout">&#8634; Shuffle Layout</button>
             <button id="checkContrastBtn" class="btn btn-ghost" title="Audit and fix text contrast">Check Contrast</button>
             <button id="resetPositionsBtn" class="btn btn-ghost">Reset Positions</button>
             <button id="newBannerBtn" class="btn btn-ghost">New Banner</button>
-            <button id="saveBannerBtn" class="btn btn-secondary">Save</button>
-            <button id="downloadBtn" class="btn btn-primary">Download PNG</button>
           </div>
         </div>
 
