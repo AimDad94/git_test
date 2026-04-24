@@ -191,18 +191,237 @@ function extractDesignData($, extraCss = '') {
   return design;
 }
 
+// ── Asset extraction helpers ─────────────────────────────────────────────────
+
+// Pick the highest-resolution URL from a srcset attribute.
+// Format: "img.jpg 1x, img@2x.jpg 2x" or "img-400.jpg 400w, img-800.jpg 800w".
+function parseSrcset(srcset) {
+  if (!srcset) return null;
+  const candidates = srcset
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const parts = entry.split(/\s+/);
+      const url = parts[0];
+      let weight = 1;
+      const descriptor = parts[1];
+      if (descriptor) {
+        const m = descriptor.match(/^(\d+(?:\.\d+)?)([wx])$/);
+        if (m) weight = parseFloat(m[1]) * (m[2] === 'w' ? 1 : 1000);
+      }
+      return { url, weight };
+    });
+  if (!candidates.length) return null;
+  candidates.sort((a, b) => b.weight - a.weight);
+  return candidates[0].url;
+}
+
+// Pull the best image URL from an <img> — honours srcset + common lazy-load attrs.
+function bestImgSrc($el) {
+  const srcset = $el.attr('srcset') || $el.attr('data-srcset');
+  if (srcset) {
+    const best = parseSrcset(srcset);
+    if (best) return best;
+  }
+  return (
+    $el.attr('src') ||
+    $el.attr('data-src') ||
+    $el.attr('data-lazy-src') ||
+    $el.attr('data-original') ||
+    $el.attr('data-hi-res-src') ||
+    $el.attr('data-image') ||
+    null
+  );
+}
+
+// Pull all url(...) targets from a block of CSS text.
+function extractCssBackgroundImages(css) {
+  if (!css) return [];
+  const urls = new Set();
+  const re = /background(?:-image)?\s*:[^;{}]*?url\(\s*['"]?([^'")]+)['"]?\s*\)/gi;
+  let m;
+  while ((m = re.exec(css)) !== null) {
+    const url = m[1].trim();
+    if (url && !url.startsWith('data:')) urls.add(url);
+  }
+  return [...urls];
+}
+
+// Walk JSON-LD structured data for Organization.logo and *.image fields.
+function extractJsonLd($) {
+  const out = { logos: [], images: [] };
+  $('script[type="application/ld+json"]').each((_, el) => {
+    let parsed;
+    try { parsed = JSON.parse($(el).text() || $(el).html() || ''); } catch { return; }
+    const visit = (node) => {
+      if (!node) return;
+      if (Array.isArray(node)) { node.forEach(visit); return; }
+      if (typeof node !== 'object') return;
+      if (node.logo) {
+        const url = typeof node.logo === 'string' ? node.logo : node.logo.url;
+        if (typeof url === 'string') out.logos.push(url);
+      }
+      if (node.image) {
+        const arr = Array.isArray(node.image) ? node.image : [node.image];
+        arr.forEach((i) => {
+          const url = typeof i === 'string' ? i : i?.url;
+          if (typeof url === 'string') out.images.push(url);
+        });
+      }
+      if (node['@graph']) visit(node['@graph']);
+    };
+    visit(parsed);
+  });
+  return out;
+}
+
+// Collect logo candidates with priority scoring. Higher score = more likely.
+function extractLogos($, baseUrl, jsonLdLogos) {
+  const scored = new Map();
+  const add = (url, score) => {
+    if (!url || url.startsWith('data:')) return;
+    const resolved = resolveUrl(baseUrl, url);
+    if (!resolved) return;
+    const prev = scored.get(resolved);
+    if (!prev || prev < score) scored.set(resolved, score);
+  };
+
+  // JSON-LD Organization logo is the strongest signal — publishers declare this intentionally.
+  jsonLdLogos.forEach((url) => add(url, 300));
+
+  // og:logo / meta logo fallbacks
+  const ogLogo = $('meta[property="og:logo"], meta[name="og:logo"]').attr('content');
+  if (ogLogo) add(ogLogo, 260);
+
+  // apple-touch-icon (usually 180×180 PNG, high quality) and <link rel="icon">
+  $('link[rel]').each((_, el) => {
+    const $el = $(el);
+    const rel = ($el.attr('rel') || '').toLowerCase();
+    if (!/icon/.test(rel)) return;
+    const href = $el.attr('href');
+    if (!href) return;
+    const sizes = $el.attr('sizes') || '';
+    const sizeN = parseInt((sizes.match(/\d+/) || [0])[0], 10);
+    const isApple = rel.includes('apple-touch-icon');
+    const isMask = rel.includes('mask-icon');
+    // Prefer larger icons and apple-touch variants; mask-icons are SVG → high quality.
+    add(href, 100 + Math.min(sizeN, 512) + (isApple ? 40 : 0) + (isMask ? 30 : 0));
+  });
+
+  // Header/nav/logo-class <img> elements — strong DOM signal for the site's main mark.
+  const logoSelector = [
+    'header img', '.header img', '#header img',
+    '.navbar img', '.nav img', '.nav-bar img',
+    'img.logo', '.logo img', '#logo img',
+    '[class*="logo"] img', '[id*="logo"] img',
+    '[class*="brand"] img', '[id*="brand"] img',
+    'img[alt*="logo" i]',
+  ].join(', ');
+  $(logoSelector).each((_, el) => {
+    const $el = $(el);
+    const src = bestImgSrc($el);
+    if (!src) return;
+    const isSvg = /\.svg(\?|$)/i.test(src);
+    const w = parseInt($el.attr('width') || '0', 10);
+    const h = parseInt($el.attr('height') || '0', 10);
+    // Skip hero banners that happen to be inside <header> — logos are typically < 400px wide.
+    if (w > 600 || h > 400) return;
+    add(src, 200 + (isSvg ? 60 : 0));
+  });
+
+  // Inline SVG with logo-ish class/id — can't be downloaded as-is but worth noting.
+  // (Skipped for now: rendering inline SVG requires extracting + serialising.)
+
+  return [...scored.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([url]) => url)
+    .slice(0, 8);
+}
+
+// Rank-aware image extractor: pulls from <img>/srcset, <picture>, meta tags,
+// JSON-LD, inline style backgrounds, and stylesheet background-images.
+function extractImages($, baseUrl, css, jsonLdImages) {
+  const scored = new Map();
+  const add = (url, score) => {
+    if (!url || url.startsWith('data:')) return;
+    const resolved = resolveUrl(baseUrl, url);
+    if (!resolved) return;
+    const prev = scored.get(resolved) || 0;
+    if (score > prev) scored.set(resolved, score);
+  };
+
+  // Meta tag hero images — curated by the site for social sharing.
+  const og = $('meta[property="og:image"], meta[property="og:image:secure_url"]').attr('content');
+  if (og) add(og, 240);
+  const tw = $('meta[name="twitter:image"], meta[property="twitter:image"]').attr('content');
+  if (tw) add(tw, 220);
+  const itemprop = $('meta[itemprop="image"]').attr('content');
+  if (itemprop) add(itemprop, 200);
+
+  // JSON-LD product/article images
+  jsonLdImages.forEach((url) => add(url, 180));
+
+  // <img> elements (srcset-aware)
+  $('img').each((_, el) => {
+    const $el = $(el);
+    const src = bestImgSrc($el);
+    if (!src) return;
+    const w = parseInt($el.attr('width') || '0', 10);
+    const h = parseInt($el.attr('height') || '0', 10);
+    if ((w > 0 && w < 80) || (h > 0 && h < 80)) return;
+
+    let score = 60;
+    if (w > 0) score += Math.min(w, 2000) / 20;        // bigger → better
+    if ($el.attr('alt')) score += 15;                   // alt text → likely content
+    const cls = ($el.attr('class') || '').toLowerCase();
+    if (/\b(hero|banner|feature|cover|main-image)\b/.test(cls)) score += 40;
+    if (/\b(icon|avatar|sprite|thumb)\b/.test(cls)) score -= 30;
+    add(src, score);
+  });
+
+  // <picture><source srcset> — responsive images
+  $('picture source').each((_, el) => {
+    const best = parseSrcset($(el).attr('srcset'));
+    if (best) add(best, 90);
+  });
+
+  // Inline style="background-image: url(...)" — common for hero divs
+  $('[style*="background"]').each((_, el) => {
+    extractCssBackgroundImages($(el).attr('style') || '').forEach((url) => add(url, 120));
+  });
+
+  // Stylesheet background-images (hero sections often declared in CSS)
+  extractCssBackgroundImages(css).forEach((url) => add(url, 50));
+
+  return [...scored.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([url]) => url);
+}
+
 async function extractPageData(html, baseUrl) {
   const $ = cheerio.load(html);
 
-  // Fetch external stylesheets (so we can see fonts/colours declared outside inline <style>)
+  // Fetch external stylesheets — needed for fonts, colours, AND background-images.
   const extraCss = await fetchStylesheets($, baseUrl);
 
-  // Extract design data BEFORE stripping style tags
+  // Collect inline <style> blocks so we can mine them for background-images too.
+  const inlineStyleChunks = [];
+  $('style').each((_, el) => inlineStyleChunks.push($(el).text()));
+  const allCss = [extraCss, ...inlineStyleChunks].join('\n');
+
+  // Extract design data BEFORE any DOM pruning.
   const design = extractDesignData($, extraCss);
 
+  // JSON-LD is structured data, read it once — used by both logo and image paths.
+  const jsonLd = extractJsonLd($);
+
+  // Logos come from the FULL DOM (header/nav is where they live).
+  const logos = extractLogos($, baseUrl, jsonLd.logos);
+
+  // Now strip chrome so textContent/images come from body/main content only.
   $('script, style, nav, footer, header, [role="navigation"]').remove();
 
-  const ogImage = $('meta[property="og:image"]').attr('content');
   const ogTitle = $('meta[property="og:title"]').attr('content') || '';
   const title = $('title').text().trim();
   const description =
@@ -222,22 +441,7 @@ async function extractPageData(html, baseUrl) {
     .filter((t) => t.length > 30)
     .slice(0, 6);
 
-  const images = [];
-
-  if (ogImage) {
-    const resolved = resolveUrl(baseUrl, ogImage);
-    if (resolved) images.push(resolved);
-  }
-
-  $('img').each((_, el) => {
-    const src = $(el).attr('src') || $(el).attr('data-src') || $(el).attr('data-lazy-src');
-    const w = parseInt($(el).attr('width') || '0', 10);
-    const h = parseInt($(el).attr('height') || '0', 10);
-    if (!src || src.startsWith('data:') || src.includes('logo') || src.includes('icon')) return;
-    if ((w > 0 && w < 80) || (h > 0 && h < 80)) return;
-    const resolved = resolveUrl(baseUrl, src);
-    if (resolved && !images.includes(resolved)) images.push(resolved);
-  });
+  const images = extractImages($, baseUrl, allCss, jsonLd.images);
 
   const textContent = [ogTitle || title, description, ...headings, ...paragraphs]
     .join('\n')
@@ -247,7 +451,8 @@ async function extractPageData(html, baseUrl) {
 
   return {
     textContent,
-    images: images.slice(0, 12),
+    images: images.slice(0, 20),
+    logos,
     title: ogTitle || title,
     design,
   };
@@ -270,6 +475,7 @@ app.post('/api/analyze', async (req, res) => {
   try {
     let textContent = '';
     let images = [];
+    let logos = [];
     let title = '';
     let design = { themeColor: '', googleFonts: [], cssVars: {}, dominantColors: [], bodyFont: '', headlineFont: '' };
 
@@ -282,6 +488,7 @@ app.post('/api/analyze', async (req, res) => {
         const page = await extractPageData(html, websiteUrl);
         textContent = page.textContent;
         images      = page.images;
+        logos       = page.logos || [];
         title       = page.title;
         design      = page.design;
       } catch (err) {
@@ -403,7 +610,7 @@ Return ONLY a valid JSON object — no markdown, no explanation:
       };
     }
 
-    res.json({ analysis, images });
+    res.json({ analysis, images, logos });
   } catch (err) {
     console.error('Analyze error:', err);
     res.status(500).json({ error: err.message });

@@ -49,8 +49,19 @@
       <!-- Background Image Selector (shown after analysis) -->
       <section class="panel hidden" id="imagePanel">
         <h2 class="panel-title">Background Image</h2>
+        <div id="logoSection" class="logo-section hidden">
+          <p class="panel-hint" style="margin-bottom:6px">Logo fra siden</p>
+          <div id="logoGrid" class="logo-grid"></div>
+        </div>
         <p class="panel-hint">Click an image to use as background</p>
         <div id="imageGrid" class="image-grid"></div>
+        <div class="field" style="margin-top:10px">
+          <label for="uploadImage">Or upload from your computer</label>
+          <label for="uploadImage" class="file-upload-btn">
+            <span>&#128206;</span> Vælg fil fra din computer
+          </label>
+          <input type="file" id="uploadImage" accept="image/*" class="file-input-hidden">
+        </div>
         <div class="field" style="margin-top:10px">
           <label for="customImageUrl">Or enter image URL</label>
           <div class="input-row">
@@ -100,6 +111,7 @@
             <!-- Overlay layer -->
             <div id="bannerOverlay" class="banner-overlay"></div>
             <!-- Draggable elements — positioned absolutely by JS -->
+            <img id="previewLogo"        class="banner-el banner-logo"     data-element="logo" alt="Logo" style="display:none">
             <div id="previewCompanyName" class="banner-el banner-company" data-element="companyName"></div>
             <div id="previewHeadline"    class="banner-el banner-headline" data-element="headline">Your Banner Headline</div>
             <div id="previewSubtext"     class="banner-el banner-subtext"  data-element="subtext">Supporting text will appear here after analysis</div>
@@ -189,6 +201,33 @@
               </div>
               <input type="text" id="editCta" placeholder="Learn More">
             </div>
+
+            <!-- Logo (free-floating image overlay) -->
+            <div class="field span-2">
+              <div class="label-row">
+                <label>Logo</label>
+                <label class="toggle toggle-sm" title="Show logo overlay">
+                  <input type="checkbox" id="editShowLogo">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div id="logoPreviewRow" class="logo-preview-row">
+                <img id="logoPreviewThumb" class="logo-preview-thumb" alt="" style="display:none">
+                <span id="logoPreviewEmpty" class="panel-hint">Intet logo valgt — klik et i sidebaren eller indsæt en URL.</span>
+                <button type="button" id="clearLogoBtn" class="btn btn-ghost btn-sm" style="display:none">Fjern</button>
+              </div>
+              <div class="input-row" style="margin-top:6px">
+                <input type="url" id="editLogoUrl" placeholder="https://example.com/logo.svg">
+                <button type="button" id="setLogoUrlBtn" class="btn btn-sm">Brug</button>
+              </div>
+            </div>
+            <div class="field span-2">
+              <div class="range-row">
+                <label for="editLogoSize">Logo Size</label>
+                <span id="logoSizeValue" class="range-value">56px</span>
+              </div>
+              <input type="range" id="editLogoSize" min="20" max="200" value="56" class="range-input">
+            </div>
           </div>
         </div>
 
@@ -251,6 +290,12 @@
                 <span class="fit-hint">Træk i baggrunden for at flytte billedet i Fill-mode</span>
               </div>
             </div>
+
+            <!-- Zone colours (split layouts only) -->
+            <div class="field span-3 section-divider" id="zoneColorsSection" style="display:none">
+              <span class="section-label">Zone-farver</span>
+            </div>
+            <div class="field span-3" id="zoneColorsContainer" style="display:none"></div>
 
             <!-- CTA Button formatting -->
             <div class="field span-3 section-divider">

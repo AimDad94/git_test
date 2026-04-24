@@ -9,6 +9,7 @@ const FORMATS = [
 
 /* ── Default element positions (center-point x,y within 600×320 banner) ─── */
 const DEFAULT_POSITIONS = {
+  logo:        { x: 70,  y: 40  },  // top-left, free-floating (not in stack)
   companyName: { x: 300, y: 42  },
   headline:    { x: 300, y: 135 },
   subtext:     { x: 300, y: 198 },
@@ -39,6 +40,13 @@ const state = {
   showSubtext: false,
   showTagline: false,
   showCta: true,
+  // Logo (free-floating image element, independent of text stack)
+  logoUrl: null,
+  logoBase64: null,
+  showLogo: false,
+  logoSize: 56, // height in source pixels; width auto via aspect ratio
+  // Scraped logo candidates from last analyze pass (shown in the logo picker)
+  scrapedLogos: [],
   // Background
   selectedImageBase64: null,
   imageAvgColor: null,
@@ -271,6 +279,7 @@ const SLIDER_BOUNDS = {
 /* Vertical stacking order (top → bottom) */
 const STACK_ORDER = ['companyName', 'headline', 'subtext', 'cta', 'tagline'];
 const ELEMENT_IDS = {
+  logo:        'previewLogo',
   companyName: 'previewCompanyName',
   headline:    'previewHeadline',
   subtext:     'previewSubtext',
@@ -279,6 +288,8 @@ const ELEMENT_IDS = {
 };
 
 function isElementVisible(key) {
+  // Logo is free-floating — not filtered by zones, not part of the text stack.
+  if (key === 'logo') return !!state.showLogo && !!(state.logoBase64 || state.logoUrl);
   // In zoned layouts, only elements assigned to a zone are shown.
   if (state.zones && state.zones.length) {
     const assigned = state.zones.some((z) => z.elements.includes(key));
@@ -442,6 +453,8 @@ function snapshotVariant() {
     zones:             JSON.parse(JSON.stringify(state.zones || [])),
     elementColors:     { ...(state.elementColors || {}) },
     elementTextAligns: { ...(state.elementTextAligns || {}) },
+    logoSize:          state.logoSize,
+    showLogo:          state.showLogo,
   };
   for (const k of VARIANT_KEYS) snap[k] = state[k];
   return snap;
@@ -453,6 +466,8 @@ function applyVariant(snap) {
   state.zones             = JSON.parse(JSON.stringify(snap.zones || []));
   state.elementColors     = { ...(snap.elementColors || {}) };
   state.elementTextAligns = { ...(snap.elementTextAligns || {}) };
+  if (typeof snap.logoSize === 'number') state.logoSize = snap.logoSize;
+  if (typeof snap.showLogo === 'boolean') state.showLogo = snap.showLogo;
   populateEditors();
   renderPreview();
 }
@@ -771,6 +786,75 @@ function effectiveTextAlign(key) {
   return (state.elementTextAligns && state.elementTextAligns[key]) || state.textAlign;
 }
 
+/* Render color pickers for each solid-color zone in the current layout.
+ * Called by populateEditors; hides itself when no color zones exist. */
+function renderZoneColorControls() {
+  const section = $('zoneColorsSection');
+  const container = $('zoneColorsContainer');
+  if (!section || !container) return;
+
+  const colorZoneIndices = (state.zones || [])
+    .map((z, i) => ({ z, i }))
+    .filter(({ z }) => z.bg === 'color');
+
+  if (!colorZoneIndices.length) {
+    section.style.display = 'none';
+    container.style.display = 'none';
+    container.innerHTML = '';
+    return;
+  }
+
+  section.style.display = '';
+  container.style.display = '';
+  container.innerHTML = '';
+
+  colorZoneIndices.forEach(({ z, i }) => {
+    const row = document.createElement('div');
+    row.className = 'zone-color-row';
+    // A descriptive label based on which elements live in the zone
+    const labels = (z.elements || []).slice(0, 2).join(' + ') || `Zone ${i + 1}`;
+    row.innerHTML = `
+      <span class="zone-color-label">${labels}</span>
+      <input type="color" class="zone-color-picker" data-zone-index="${i}" value="${z.color}">
+      <input type="text" class="hex-input zone-color-hex" data-zone-index="${i}" value="${z.color}" maxlength="7">
+    `;
+    container.appendChild(row);
+  });
+
+  container.querySelectorAll('.zone-color-picker, .zone-color-hex')
+    .forEach((el) => el.addEventListener('input', handleZoneColorChange));
+}
+
+function handleZoneColorChange(e) {
+  const idx = parseInt(e.target.dataset.zoneIndex, 10);
+  const zone = state.zones?.[idx];
+  if (!zone) return;
+  const val = e.target.value.trim();
+  if (!/^#[0-9a-f]{6}$/i.test(val)) return;
+
+  const oldTextColor = zone.textColor;
+  zone.color = val;
+
+  // Re-pick text colour against the new bg so labels stay readable. Any element
+  // text colour that still matches the previous auto-pick follows along.
+  const newTextColor = relativeLuminance(val) > 0.55 ? '#1a1a2e' : '#ffffff';
+  if (oldTextColor && oldTextColor.toLowerCase() !== newTextColor.toLowerCase()) {
+    zone.textColor = newTextColor;
+    (zone.elements || []).forEach((key) => {
+      if (state.elementColors[key] &&
+          state.elementColors[key].toLowerCase() === oldTextColor.toLowerCase()) {
+        state.elementColors[key] = newTextColor;
+      }
+    });
+  }
+
+  // Sync the sibling input (hex ↔ picker)
+  document.querySelectorAll(`[data-zone-index="${idx}"]`).forEach((s) => {
+    if (s !== e.target && s.value !== val) s.value = val;
+  });
+  renderPreview();
+}
+
 /* ── Render ──────────────────────────────────────────────────────────────── */
 function renderPreview() {
   const preview = $('bannerPreview');
@@ -879,6 +963,16 @@ function renderPreview() {
   cta.style.left = pos.cta.x + 'px';
   cta.style.top  = pos.cta.y + 'px';
   cta.style.display = isElementVisible('cta') ? '' : 'none';
+
+  // Logo (free-floating image, not part of the text stack)
+  const logo = $('previewLogo');
+  const logoSrc = state.logoBase64 || state.logoUrl || '';
+  if (logoSrc) logo.src = logoSrc;
+  logo.style.height = (state.logoSize || 56) + 'px';
+  logo.style.width = 'auto';
+  logo.style.left = (pos.logo?.x ?? DEFAULT_POSITIONS.logo.x) + 'px';
+  logo.style.top  = (pos.logo?.y ?? DEFAULT_POSITIONS.logo.y) + 'px';
+  logo.style.display = isElementVisible('logo') ? '' : 'none';
 
   // Tagline
   const tagline = $('previewTagline');
@@ -989,6 +1083,9 @@ function syncFromEditors() {
   state.showSubtext     = $('editShowSubtext').checked;
   state.showTagline     = $('editShowTagline').checked;
   state.showCta         = $('editShowCta').checked;
+  state.showLogo        = $('editShowLogo').checked;
+  state.logoSize        = parseInt($('editLogoSize').value, 10);
+  $('logoSizeValue').textContent = state.logoSize + 'px';
 
   state.primaryColor  = $('editPrimaryColor').value;
   state.secondaryColor = $('editSecondaryColor').value;
@@ -1047,6 +1144,10 @@ function populateEditors() {
   $('editShowSubtext').checked     = state.showSubtext;
   $('editShowTagline').checked     = state.showTagline;
   $('editShowCta').checked         = state.showCta;
+  $('editShowLogo').checked        = state.showLogo;
+  $('editLogoSize').value          = state.logoSize;
+  $('logoSizeValue').textContent   = state.logoSize + 'px';
+  syncLogoPreview();
 
   $('editPrimaryColor').value   = state.primaryColor;
   $('editSecondaryColor').value = state.secondaryColor;
@@ -1090,6 +1191,7 @@ function populateEditors() {
 
   $('bannerName').value = state.bannerName || state.companyName || '';
   syncFitButtons();
+  renderZoneColorControls();
 }
 
 function syncFitButtons() {
@@ -1129,7 +1231,7 @@ async function handleAnalyze(e) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Analysis failed');
 
-    const { analysis, images } = data;
+    const { analysis, images, logos = [] } = data;
 
     // Apply Claude's suggestions to state
     Object.assign(state, {
@@ -1158,6 +1260,10 @@ async function handleAnalyze(e) {
       imageFit:        'cover',
       imagePosX:       50,
       imagePosY:       50,
+      logoUrl:         null,
+      logoBase64:      null,
+      showLogo:        false,
+      logoSize:        56,
       currentBannerId: null,
       bannerName:     analysis.companyName || '',
       positions:      scalePositions(clonePositions(), FORMATS[0].sourceW, FORMATS[0].sourceH, state.format.sourceW, state.format.sourceH),
@@ -1180,6 +1286,7 @@ async function handleAnalyze(e) {
     populateEditors();
     renderPreview();
     renderImageGrid(images);
+    renderLogoGrid(logos);
 
     $('imagePanel').classList.remove('hidden');
     $('editorPanel').classList.add('hidden');            // hide full editor — user enters via "Tilpas"
@@ -1215,6 +1322,125 @@ function renderImageGrid(imageUrls) {
     img.addEventListener('error', () => img.style.display = 'none');
     grid.appendChild(img);
   });
+}
+
+/* ── Logo element (free-floating overlay on top of background) ───────────── */
+
+// Fetch a logo URL as base64 (via /api/image-base64) and install it as the
+// banner's logo element. Automatically toggles showLogo on.
+async function setLogo(url) {
+  if (!url) return;
+  try {
+    const res = await fetch('/api/image-base64?url=' + encodeURIComponent(url));
+    if (!res.ok) throw new Error('Could not load logo');
+    const { dataUrl } = await res.json();
+    state.logoUrl    = url;
+    state.logoBase64 = dataUrl;
+    state.showLogo   = true;
+    populateEditors();
+    renderPreview();
+    showToast('Logo added. Drag to reposition.');
+  } catch (err) {
+    showError('Could not load that logo: ' + err.message);
+  }
+}
+
+function clearLogo() {
+  state.logoUrl    = null;
+  state.logoBase64 = null;
+  state.showLogo   = false;
+  populateEditors();
+  renderPreview();
+}
+
+// Reflect current logo state in the editor's preview thumbnail + clear button.
+function syncLogoPreview() {
+  const thumb = $('logoPreviewThumb');
+  const empty = $('logoPreviewEmpty');
+  const clear = $('clearLogoBtn');
+  const urlInput = $('editLogoUrl');
+  if (!thumb || !empty || !clear) return;
+  const src = state.logoBase64 || state.logoUrl;
+  if (src) {
+    thumb.src = src;
+    thumb.style.display = '';
+    empty.style.display = 'none';
+    clear.style.display = '';
+    if (urlInput && state.logoUrl) urlInput.value = state.logoUrl;
+  } else {
+    thumb.src = '';
+    thumb.style.display = 'none';
+    empty.style.display = '';
+    clear.style.display = 'none';
+    if (urlInput) urlInput.value = '';
+  }
+}
+
+/* ── Logo grid (scraped from site) ───────────────────────────────────────── */
+function renderLogoGrid(logoUrls) {
+  const section = $('logoSection');
+  const grid = $('logoGrid');
+  state.scrapedLogos = logoUrls || [];
+  grid.innerHTML = '';
+  if (!logoUrls || !logoUrls.length) {
+    section.classList.add('hidden');
+    return;
+  }
+  section.classList.remove('hidden');
+  logoUrls.forEach((url) => {
+    const img = document.createElement('img');
+    img.src = url;
+    img.className = 'logo-thumb';
+    img.alt = 'Logo';
+    img.loading = 'lazy';
+    img.title = 'Klik for at lægge logoet oven på banneret';
+    img.addEventListener('click', () => setLogo(url));
+    img.addEventListener('error', () => img.style.display = 'none');
+    grid.appendChild(img);
+  });
+}
+
+/* ── Local file upload ───────────────────────────────────────────────────── */
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload  = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('Could not read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleFileUpload(e) {
+  const input = e.target;
+  const file = input.files?.[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    showError('Vælg venligst en billedfil.');
+    input.value = '';
+    return;
+  }
+  if (file.size > 20 * 1024 * 1024) {
+    showError('Billedet er for stort (maks 20MB).');
+    input.value = '';
+    return;
+  }
+  try {
+    const dataUrl = await readFileAsDataURL(file);
+    // Store the data URL as both url (key) and base64 (cached payload) so
+    // selectImage hits its cache path and skips the /api/image-base64 hop.
+    if (!state.images.some((i) => i.url === dataUrl)) {
+      state.images.push({ url: dataUrl, base64: dataUrl });
+    }
+    renderImageGrid(state.images.map((i) => i.url));
+    $('imagePanel').classList.remove('hidden');
+    await selectImage(dataUrl);
+    showToast(`Uploadet: ${file.name}`);
+  } catch (err) {
+    showError('Upload fejlede: ' + err.message);
+  } finally {
+    // Clear so the same file can be re-picked to trigger change again
+    input.value = '';
+  }
 }
 
 /* ── Pixabay search ──────────────────────────────────────────────────────── */
@@ -1355,6 +1581,10 @@ async function handleSave() {
     imageFit: state.imageFit,
     imagePosX: state.imagePosX,
     imagePosY: state.imagePosY,
+    logoUrl: state.logoUrl,
+    logoBase64: state.logoBase64,
+    showLogo: state.showLogo,
+    logoSize: state.logoSize,
     imageUrls: state.images.map((i) => i.url),
     positions: state.positions,
     zones: state.zones,
@@ -1544,6 +1774,10 @@ function loadBanner(b) {
     imageFit:            b.imageFit   || 'cover',
     imagePosX:           b.imagePosX ?? 50,
     imagePosY:           b.imagePosY ?? 50,
+    logoUrl:             b.logoUrl    || null,
+    logoBase64:          b.logoBase64 || null,
+    showLogo:            b.showLogo === true,
+    logoSize:            b.logoSize   || 56,
     images:              (b.imageUrls || []).map((url) => ({ url, base64: null })),
     currentBannerId:     b.id,
     bannerName:          b.name || b.companyName || '',
@@ -1558,6 +1792,8 @@ function loadBanner(b) {
     renderImageGrid(b.imageUrls);
     $('imagePanel').classList.remove('hidden');
   }
+  // Clear any logos from a prior analyze pass — saved banners don't carry them.
+  renderLogoGrid([]);
 
   populateEditors();
   renderPreview();
@@ -1609,6 +1845,11 @@ function resetBanner() {
     imageFit: 'cover',
     imagePosX: 50,
     imagePosY: 50,
+    logoUrl: null,
+    logoBase64: null,
+    showLogo: false,
+    logoSize: 56,
+    scrapedLogos: [],
     bgColor: '#1a1a2e',
     showOverlay: false,
     overlayColor: '#000000',
@@ -1639,6 +1880,7 @@ function resetBanner() {
   populateEditors();
   renderPreview();
   $('imageGrid').innerHTML = '';
+  renderLogoGrid([]);
   $('imagePanel').classList.add('hidden');
   $('variantPanel').classList.add('hidden');
   $('quickActions').classList.add('hidden');
@@ -2044,14 +2286,25 @@ function init() {
     'editHeadlineSize', 'editSubtextSize', 'editCompanySize', 'editTaglineSize',
     'editHeadlineWeight', 'editTextAlign', 'editOverlayOpacity', 'editFontFamily',
     'editShowCompanyName', 'editShowHeadline', 'editShowSubtext',
-    'editShowTagline', 'editShowCta', 'editShowOverlay',
+    'editShowTagline', 'editShowCta', 'editShowOverlay', 'editShowLogo',
+    'editLogoSize',
     'editCtaFontSize', 'editCtaBorderRadius', 'editCtaPaddingV', 'editCtaPaddingH',
     'editCtaFontWeight',
   ];
   liveEditors.forEach((id) => $(id).addEventListener('input', syncFromEditors));
   // Checkboxes need 'change' too (some browsers fire only 'change' for them)
-  ['editShowCompanyName','editShowHeadline','editShowSubtext','editShowTagline','editShowCta','editShowOverlay']
+  ['editShowCompanyName','editShowHeadline','editShowSubtext','editShowTagline','editShowCta','editShowOverlay','editShowLogo']
     .forEach((id) => $(id).addEventListener('change', syncFromEditors));
+
+  // Logo URL input + clear button
+  $('setLogoUrlBtn')?.addEventListener('click', () => {
+    const u = $('editLogoUrl').value.trim();
+    if (u) setLogo(u);
+  });
+  $('editLogoUrl')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); $('setLogoUrlBtn').click(); }
+  });
+  $('clearLogoBtn')?.addEventListener('click', clearLogo);
 
   // A "Check contrast" button: re-audits and fixes text colours on demand
   $('checkContrastBtn')?.addEventListener('click', () => {
@@ -2081,6 +2334,9 @@ function init() {
     selectImage(url);
     $('customImageUrl').value = '';
   });
+
+  // Upload image from local computer
+  $('uploadImage').addEventListener('change', handleFileUpload);
 
   // Pixabay search
   $('pixabaySearchBtn').addEventListener('click', runPixabaySearch);
