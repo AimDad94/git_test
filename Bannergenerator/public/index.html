@@ -137,6 +137,14 @@
         <button id="saveBannerBtn" class="btn btn-secondary">Save</button>
         <button id="downloadBtn" class="btn btn-primary">Download PNG</button>
       </div>
+    </main>
+
+    <!-- ── Right Sidebar: Customize ── -->
+    <aside class="customize-sidebar">
+      <div class="customize-header">
+        <span class="customize-title">Tilpas</span>
+        <span class="customize-sub">Stil, tekst &amp; layout</span>
+      </div>
 
       <!-- Editor Panel (shown after analysis or when loading a saved banner) -->
       <div id="editorPanel" class="editor-panel hidden">
@@ -392,7 +400,14 @@
         </div>
 
       </div>
-    </main>
+
+      <!-- Empty state — shown when no banner exists yet -->
+      <div class="customize-empty">
+        <div class="customize-empty-icon">&#9671;</div>
+        <p class="customize-empty-title">Intet banner endnu</p>
+        <p class="customize-empty-hint">Generér et banner fra venstre, så kan du tilpasse det her.</p>
+      </div>
+    </aside>
   </div>
 
   <script src="app.js"></script>
