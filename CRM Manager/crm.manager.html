@@ -158,11 +158,12 @@
   .row-action:hover { background: #fee2e2; color: var(--danger); }
   .row-action.restore:hover { background: #d1fae5; color: var(--ok); }
 
-  tbody tr.excluded { opacity: 0.55; }
+  tbody tr.excluded { opacity: 0.7; }
   tbody tr.excluded .row-action { opacity: 0.8; color: var(--ok); }
-  tbody tr.excluded td.name::after {
-    content: ' · excluded'; color: var(--muted); font-size: 11px; font-weight: 400;
-  }
+  .excluded-note { display: block; color: var(--muted); font-size: 11px;
+    font-weight: 400; margin-top: 2px; font-style: italic; }
+  .excluded-note::before { content: 'Excluded: '; font-style: normal; font-weight: 500;
+    color: var(--accent-strong); }
 </style>
 </head>
 <body>
@@ -383,7 +384,10 @@
 
   function actionCell(c) {
     if (c.doNotContact) {
-      return `<td class="action"><button class="row-action restore" data-action="restore" title="Restore to call list">↺</button></td>`;
+      const tip = c.doNotContactReason
+        ? `Restore to call list — excluded: ${c.doNotContactReason.replace(/"/g, '&quot;')}`
+        : 'Restore to call list';
+      return `<td class="action"><button class="row-action restore" data-action="restore" title="${tip}">↺</button></td>`;
     }
     return `<td class="action"><button class="row-action" data-action="exclude" title="Exclude from call list">×</button></td>`;
   }
@@ -402,7 +406,7 @@
         <td class="rank">${rankCell}</td>
         <td><span class="score ${scoreClass(c.priority.total)}">${c.priority.total.toFixed(0)}</span></td>
         <td><span class="score ${riskClass(risk)}">${risk.toFixed(0)}</span></td>
-        <td class="name">${escape(c.customerName)}</td>
+        <td class="name">${escape(c.customerName)}${c.doNotContact && c.doNotContactReason ? `<span class="excluded-note">${escape(c.doNotContactReason)}</span>` : c.doNotContact ? '<span class="excluded-note"></span>' : ''}</td>
         <td>${lastCallCell(c.lastCallDate)}</td>
         <td>${satisfactionCell(c.satisfactionScore)}</td>
         <td class="mrr">${fmtMRR(c.mrr)}</td>
@@ -440,16 +444,24 @@
         const idx = +tr.dataset.idx;
         const customer = items[idx];
         const action = btn.dataset.action;
-        const verb = action === 'exclude' ? 'Exclude' : 'Restore';
-        const prep = action === 'exclude' ? 'from' : 'to';
-        if (!confirm(`${verb} "${customer.customerName}" ${prep} the call list?`)) return;
+        const body = { customerName: customer.customerName };
+        if (action === 'exclude') {
+          const reason = (prompt(`Exclude "${customer.customerName}" from the call list.\n\nWhy are we excluding this customer?`) || '').trim();
+          if (!reason) return;
+          body.reason = reason;
+        } else {
+          if (!confirm(`Restore "${customer.customerName}" to the call list?`)) return;
+        }
         try {
           const res = await fetch('/api/do-not-contact', {
             method: action === 'exclude' ? 'POST' : 'DELETE',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ customerName: customer.customerName })
+            body: JSON.stringify(body)
           });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${res.status}`);
+          }
           await load();
         } catch (err) {
           alert(`Failed: ${err.message}`);

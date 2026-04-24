@@ -156,7 +156,16 @@ function loadDoNotContact() {
   try {
     const raw = fs.readFileSync(DNC_FILE, 'utf8');
     const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? arr : [];
+    if (!Array.isArray(arr)) return [];
+    return arr.map(entry =>
+      typeof entry === 'string'
+        ? { customerName: entry, reason: '', excludedAt: null }
+        : {
+            customerName: entry.customerName || '',
+            reason: entry.reason || '',
+            excludedAt: entry.excludedAt || null
+          }
+    ).filter(e => e.customerName);
   } catch {
     return [];
   }
@@ -183,10 +192,13 @@ app.get('/api/customers', async (_req, res) => {
       ranked = rankByContactPriority(items);
       cache = { fetchedAt: now, items: ranked };
     }
-    const dncSet = new Set(loadDoNotContact().map(normaliseName));
-    const flagged = ranked.map(c =>
-      dncSet.has(normaliseName(c.customerName)) ? { ...c, doNotContact: true } : c
-    );
+    const dncMap = new Map(loadDoNotContact().map(e => [normaliseName(e.customerName), e]));
+    const flagged = ranked.map(c => {
+      const entry = dncMap.get(normaliseName(c.customerName));
+      return entry
+        ? { ...c, doNotContact: true, doNotContactReason: entry.reason, excludedAt: entry.excludedAt }
+        : c;
+    });
     res.json({
       total: flagged.length,
       excludedCount: flagged.filter(c => c.doNotContact).length,
@@ -205,19 +217,22 @@ app.get('/api/do-not-contact', (_req, res) => {
 
 app.post('/api/do-not-contact', (req, res) => {
   const name = (req.body && req.body.customerName || '').trim();
+  const reason = (req.body && req.body.reason || '').trim();
   if (!name) return res.status(400).json({ error: 'customerName required' });
+  if (!reason) return res.status(400).json({ error: 'reason required' });
   const list = loadDoNotContact();
-  if (!list.some(n => normaliseName(n) === normaliseName(name))) {
-    list.push(name);
-    saveDoNotContact(list);
-  }
+  const idx = list.findIndex(e => normaliseName(e.customerName) === normaliseName(name));
+  const entry = { customerName: name, reason, excludedAt: new Date().toISOString() };
+  if (idx === -1) list.push(entry);
+  else list[idx] = { ...list[idx], reason, excludedAt: entry.excludedAt };
+  saveDoNotContact(list);
   res.json({ items: list });
 });
 
 app.delete('/api/do-not-contact', (req, res) => {
   const name = (req.body && req.body.customerName || '').trim();
   if (!name) return res.status(400).json({ error: 'customerName required' });
-  const list = loadDoNotContact().filter(n => normaliseName(n) !== normaliseName(name));
+  const list = loadDoNotContact().filter(e => normaliseName(e.customerName) !== normaliseName(name));
   saveDoNotContact(list);
   res.json({ items: list });
 });
