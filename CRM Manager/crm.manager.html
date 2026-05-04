@@ -94,15 +94,18 @@
 
   .breakdown { background: var(--accent-soft); padding: 16px 18px 20px 58px;
     border-top: 1px solid rgba(220, 38, 38, 0.12); }
-  .breakdown h4 { margin: 0 0 10px; font-size: 11px; text-transform: uppercase;
+  .breakdown h4 { margin: 0 0 12px; font-size: 11px; text-transform: uppercase;
     letter-spacing: 0.06em; color: var(--accent-strong); font-weight: 700; }
-  .bars { display: grid; grid-template-columns: 140px 1fr 60px; row-gap: 6px; column-gap: 10px;
-    align-items: center; font-size: 12px; max-width: 560px; }
-  .bar-label { color: var(--muted); }
-  .bar-track { background: #fce7e7; border-radius: 4px; height: 8px; overflow: hidden; }
-  .bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-strong));
-    border-radius: 4px; }
-  .bar-val { font-variant-numeric: tabular-nums; text-align: right; color: var(--text); font-weight: 500; }
+  .signals { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 8px 16px; max-width: 760px; }
+  .signal-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .signal-row.miss { color: var(--muted); }
+  .signal-row.hit { color: var(--text); font-weight: 500; }
+  .signal-mark { display: inline-flex; align-items: center; justify-content: center;
+    width: 18px; height: 18px; border-radius: 50%; font-size: 11px; font-weight: 700;
+    flex-shrink: 0; }
+  .signal-mark.hit { background: var(--accent); color: #fff; }
+  .signal-mark.miss { background: #e7e5e4; color: var(--muted); }
 
   thead th.sortable { cursor: pointer; user-select: none; transition: background 0.15s, color 0.15s; }
   thead th.sortable:hover { color: var(--text); background: #f6efef; }
@@ -147,9 +150,6 @@
   .toolbar .toggle.active { background: var(--accent-soft); color: var(--accent-strong);
     border-color: #fbb6b6; }
 
-  .card.no-risk th:nth-child(3),
-  .card.no-risk td:nth-child(3) { display: none; }
-
   td.action { width: 32px; text-align: center; padding: 0 8px; }
   .row-action { opacity: 0; border: none; background: transparent; cursor: pointer;
     color: var(--muted); font-size: 16px; line-height: 1; padding: 4px 6px;
@@ -169,13 +169,13 @@
 <body>
 <header>
   <h1>CRM Manager — Contact Priority</h1>
-  <p>Active customers ranked by contact priority, with a separate churn-risk score based on activity trends and renewal proximity. Click a row for the full breakdown.</p>
+  <p>Active customers scored on seven equally weighted signals — one point per signal. The more points, the more we need to call them. Click a row for the breakdown.</p>
 </header>
 <main>
   <div class="toolbar">
     <input id="search" type="search" placeholder="Search by customer name or site…">
     <span class="stats" id="stats"></span>
-    <button id="toggleRisk" class="toggle active" title="Hide churn risk">Churn risk</button>
+    <button id="toggleEnding" class="toggle" title="Show customers with an end date set">Ending <span id="endingCount">0</span></button>
     <button id="toggleExcluded" class="toggle" title="Show customers excluded from the call list">Excluded <span id="excludedCount">0</span></button>
     <button id="refresh">Refresh</button>
   </div>
@@ -184,55 +184,42 @@
       <thead>
         <tr id="thead-row">
           <th class="rank">#</th>
-          <th class="sortable" data-sort="score">Score<span class="info info-below" data-tip="Who to call first. A blend of how long since we last spoke, how happy they are, how much they pay, and a few other signals. Click a row to see the full breakdown."></span><span class="arrow"></span></th>
-          <th class="sortable" data-sort="risk">Risk<span class="info info-below" data-tip="How likely the customer is to leave us, based on how their activity is trending and how close their subscription is to ending. Click a row to see what is driving it."></span><span class="arrow"></span></th>
+          <th class="sortable" data-sort="score">Score<span class="info info-below" data-tip="Each customer scores 0 or 1 on seven signals. The more points, the more we need to call them. Click a row to see which signals scored."></span><span class="arrow"></span></th>
           <th class="sortable" data-sort="name">Customer<span class="arrow"></span></th>
           <th class="sortable" data-sort="lastCall">Last called<span class="arrow"></span></th>
           <th class="sortable" data-sort="satisfaction">Sat.<span class="arrow"></span></th>
           <th class="sortable" data-sort="mrr">MRR<span class="arrow"></span></th>
           <th class="sortable" data-sort="invoice">Invoice<span class="arrow"></span></th>
-          <th class="sortable" data-sort="products">Products<span class="arrow"></span></th>
           <th class="sortable" data-sort="binding">Binding<span class="arrow"></span></th>
           <th></th>
         </tr>
       </thead>
       <tbody id="tbody">
-        <tr><td colspan="11" class="state">Loading…</td></tr>
+        <tr><td colspan="9" class="state">Loading…</td></tr>
       </tbody>
     </table>
   </div>
 </main>
 <script>
-  const MAX_SCORE = 100;
-  const WEIGHTS = { call: 35, satisfaction: 20, mrr: 10, invoice: 10, products: 18, binding: 7 };
+  const MAX_SCORE = 7;
+  const SIGNAL_ORDER = ['call', 'satisfaction', 'mrr', 'invoice', 'binding', 'activityDecline', 'renewal'];
   const SIGNAL_LABELS = {
     call: 'Last called',
     satisfaction: 'Satisfaction',
     mrr: 'MRR',
     invoice: 'Invoice status',
-    products: 'Products (inverse)',
-    binding: 'Binding (inverse)'
-  };
-  const RISK_WEIGHTS = { activityDecline: 50, recentZero: 30, renewal: 20 };
-  const RISK_LABELS = {
+    binding: 'Binding',
     activityDecline: 'Activity decline',
-    recentZero: 'Recent zero-activity',
-    renewal: 'Renewal approaching'
+    renewal: 'Renewal soon'
   };
-
   const SIGNAL_TIPS = {
-    call: 'How long since we last called this customer. The longer the gap, the higher the score.',
-    satisfaction: 'The satisfaction traffic light. Red raises the score the most, Green keeps it low.',
-    mrr: 'How much the customer pays us each month. Higher payers rank higher.',
-    invoice: 'Whether the customer has any unpaid invoices right now.',
-    products: 'Customers with fewer products take less effort to help, so they rank higher.',
-    binding: 'Customers not locked into a binding period are easier to lose, so they rank higher.'
-  };
-
-  const RISK_TIPS = {
-    activityDecline: 'The customer\'s activity over the last 3 months compared to the 3 months before. A big drop means their products are losing steam.',
-    recentZero: 'Zero clicks, impressions and article reads in the most recent month — or the last two. The clearest sign a product has gone dead.',
-    renewal: 'How close the subscription is to ending, and whether they are still locked into a binding period. Sooner means higher risk, unless they can\'t leave yet.'
+    call: '1 point if we have not called the customer in the last 3 months.',
+    satisfaction: '1 point if the satisfaction is Red.',
+    mrr: '1 point if the customer pays less than 1.000 DKK per month.',
+    invoice: '1 point if the customer has an unpaid invoice right now.',
+    binding: '1 point if the customer is not in a binding period.',
+    activityDecline: '1 point if the average activity over the last 3 months has dropped compared to the 3 months before.',
+    renewal: '1 point if the subscription ends within the next 3 months and the customer is no longer in binding.'
   };
 
   const tbody = document.getElementById('tbody');
@@ -240,27 +227,27 @@
   const search = document.getElementById('search');
   const refreshBtn = document.getElementById('refresh');
   const toggleExcludedBtn = document.getElementById('toggleExcluded');
-  const toggleRiskBtn = document.getElementById('toggleRisk');
+  const toggleEndingBtn = document.getElementById('toggleEnding');
   const excludedCountEl = document.getElementById('excludedCount');
-  const tableCard = document.querySelector('.card');
+  const endingCountEl = document.getElementById('endingCount');
 
   let all = [];
   let sortState = { key: 'score', dir: 'desc' };
   let showExcluded = false;
-  let showRisk = true;
+  let showEnding = false;
   let statsCounts = null;
+
+  const hasEndDate = c => !!c.endDate;
 
   const SAT_RANK = { Red: 3, Yellow: 2, null: 1, Green: 0 };
 
   const SORT_EXTRACTORS = {
     score:        c => c.priority.total,
-    risk:         c => c.churnRisk ? c.churnRisk.total : 0,
     name:         c => (c.customerName || '').toLowerCase(),
     lastCall:     c => c.lastCallDate ? new Date(c.lastCallDate).getTime() : -Infinity,
     satisfaction: c => SAT_RANK[c.satisfactionScore === null ? 'null' : c.satisfactionScore] ?? 1,
     mrr:          c => c.mrr || 0,
     invoice:      c => c.invoiceStatus === 'has_unpaid' ? 1 : 0,
-    products:     c => (c.products || []).length,
     binding:      c => {
       const end = c.bindingPeriod && c.bindingPeriod.end;
       return end && new Date(end).getTime() > Date.now() ? 1 : 0;
@@ -268,8 +255,8 @@
   };
 
   const DEFAULT_DIR = {
-    score: 'desc', risk: 'desc', name: 'asc', lastCall: 'asc', satisfaction: 'desc',
-    mrr: 'desc', invoice: 'desc', products: 'asc', binding: 'asc'
+    score: 'desc', name: 'asc', lastCall: 'asc', satisfaction: 'desc',
+    mrr: 'desc', invoice: 'desc', binding: 'asc'
   };
 
   function sortItems(items) {
@@ -309,7 +296,7 @@
     const d = daysSince(iso);
     if (d == null) return '<span class="pill pill-never">Never</span>';
     const date = new Date(iso).toLocaleDateString('da-DK');
-    const cls = d >= 30 ? 'pill-old' : 'pill-recent';
+    const cls = d > 90 ? 'pill-old' : 'pill-recent';
     return `<span class="pill ${cls}">${d}d</span> <span class="since">${date}</span>`;
   }
 
@@ -334,14 +321,8 @@
   }
 
   function scoreClass(total) {
-    if (total >= 60) return 'score-hi';
-    if (total >= 35) return 'score-md';
-    return 'score-lo';
-  }
-
-  function riskClass(total) {
-    if (total >= 50) return 'score-hi';
-    if (total >= 25) return 'score-md';
+    if (total >= 4) return 'score-hi';
+    if (total >= 2) return 'score-md';
     return 'score-lo';
   }
 
@@ -350,33 +331,28 @@
       ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
-  function barsHtml(breakdown, weights, labels, tips) {
-    return Object.entries(breakdown).map(([k, v]) => {
-      const max = weights[k];
-      const pct = max ? (v / max) * 100 : 0;
-      const tip = tips && tips[k]
-        ? `<span class="info" data-tip="${escape(tips[k])}"></span>`
+  function signalsHtml(breakdown) {
+    return SIGNAL_ORDER.map(k => {
+      const v = breakdown[k] || 0;
+      const tip = SIGNAL_TIPS[k]
+        ? `<span class="info" data-tip="${escape(SIGNAL_TIPS[k])}"></span>`
         : '';
+      const mark = v ? '<span class="signal-mark hit">✓</span>' : '<span class="signal-mark miss">·</span>';
       return `
-        <div class="bar-label">${labels[k]}${tip}</div>
-        <div class="bar-track"><div class="bar-fill" style="width:${pct.toFixed(0)}%"></div></div>
-        <div class="bar-val">${v.toFixed(1)} / ${max}</div>
+        <div class="signal-row ${v ? 'hit' : 'miss'}">
+          ${mark}
+          <span class="signal-label">${SIGNAL_LABELS[k]}${tip}</span>
+        </div>
       `;
     }).join('');
   }
 
   function breakdownRow(c) {
-    const pBars = barsHtml(c.priority.breakdown, WEIGHTS, SIGNAL_LABELS, SIGNAL_TIPS);
-    const rBars = c.churnRisk ? barsHtml(c.churnRisk.breakdown, RISK_WEIGHTS, RISK_LABELS, RISK_TIPS) : '';
     return `
-      <tr class="breakdown-row"><td colspan="11">
+      <tr class="breakdown-row"><td colspan="9">
         <div class="breakdown">
-          <h4>Priority breakdown — total ${c.priority.total.toFixed(1)} / ${MAX_SCORE}</h4>
-          <div class="bars">${pBars}</div>
-          ${showRisk && c.churnRisk ? `
-            <h4 style="margin-top:16px;">Churn risk breakdown — total ${c.churnRisk.total.toFixed(1)} / ${MAX_SCORE}</h4>
-            <div class="bars">${rBars}</div>
-          ` : ''}
+          <h4>Score breakdown — total ${c.priority.total} / ${MAX_SCORE}</h4>
+          <div class="signals">${signalsHtml(c.priority.breakdown)}</div>
         </div>
       </td></tr>
     `;
@@ -394,24 +370,21 @@
 
   function render(items) {
     if (!items.length) {
-      tbody.innerHTML = '<tr><td colspan="11" class="state">No customers match.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" class="state">No customers match.</td></tr>';
       return;
     }
     tbody.innerHTML = items.map((c, i) => {
-      const risk = c.churnRisk ? c.churnRisk.total : 0;
       const cls = c.doNotContact ? 'excluded' : '';
-      const rankCell = showExcluded ? '—' : i + 1;
+      const rankCell = showExcluded || showEnding ? '—' : i + 1;
       return `
       <tr data-idx="${i}" class="${cls}">
         <td class="rank">${rankCell}</td>
-        <td><span class="score ${scoreClass(c.priority.total)}">${c.priority.total.toFixed(0)}</span></td>
-        <td><span class="score ${riskClass(risk)}">${risk.toFixed(0)}</span></td>
+        <td><span class="score ${scoreClass(c.priority.total)}">${c.priority.total}</span></td>
         <td class="name">${escape(c.customerName)}${c.doNotContact && c.doNotContactReason ? `<span class="excluded-note">${escape(c.doNotContactReason)}</span>` : c.doNotContact ? '<span class="excluded-note"></span>' : ''}</td>
         <td>${lastCallCell(c.lastCallDate)}</td>
         <td>${satisfactionCell(c.satisfactionScore)}</td>
         <td class="mrr">${fmtMRR(c.mrr)}</td>
         <td>${invoiceCell(c.invoiceStatus)}</td>
-        <td class="muted">${(c.products || []).length}</td>
         <td>${bindingCell(c.bindingPeriod)}</td>
         ${actionCell(c)}
       </tr>
@@ -472,7 +445,10 @@
 
   function applyFilter() {
     const q = search.value.trim().toLowerCase();
-    const scope = showExcluded ? all.filter(c => c.doNotContact) : all.filter(c => !c.doNotContact);
+    let scope;
+    if (showExcluded) scope = all.filter(c => c.doNotContact);
+    else if (showEnding) scope = all.filter(c => !c.doNotContact && hasEndDate(c));
+    else scope = all.filter(c => !c.doNotContact && !hasEndDate(c));
     const base = q
       ? scope.filter(c =>
           (c.customerName || '').toLowerCase().includes(q) ||
@@ -480,11 +456,17 @@
       : scope;
     if (showExcluded) {
       stats.textContent = `Viewing ${scope.length} excluded ${scope.length === 1 ? 'customer' : 'customers'}`;
+    } else if (showEnding) {
+      stats.textContent = `Viewing ${scope.length} customers with an end date`;
     } else if (statsCounts) {
-      const { total, never, red, unpaid, highRisk } = statsCounts;
-      const parts = [`${total} customers`, `${never} never called`, `${red} red`, `${unpaid} unpaid`];
-      if (showRisk) parts.push(`${highRisk} high risk`);
-      stats.textContent = parts.join(' · ');
+      const { total, never, red, unpaid, highScore } = statsCounts;
+      stats.textContent = [
+        `${total} customers`,
+        `${never} never called`,
+        `${red} red`,
+        `${unpaid} unpaid`,
+        `${highScore} scoring 4+`
+      ].join(' · ');
     }
     render(sortItems(base));
   }
@@ -497,40 +479,51 @@
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       all = data.items;
-      const active = all.filter(c => !c.doNotContact);
-      const never = active.filter(c => !c.lastCallDate).length;
-      const red = active.filter(c => c.satisfactionScore === 'Red').length;
-      const unpaid = active.filter(c => c.invoiceStatus === 'has_unpaid').length;
-      const highRisk = active.filter(c => c.churnRisk && c.churnRisk.total >= 50).length;
-      statsCounts = { total: active.length, never, red, unpaid, highRisk };
+      const callList = all.filter(c => !c.doNotContact && !hasEndDate(c));
+      const never = callList.filter(c => !c.lastCallDate).length;
+      const red = callList.filter(c => c.satisfactionScore === 'Red').length;
+      const unpaid = callList.filter(c => c.invoiceStatus === 'has_unpaid').length;
+      const highScore = callList.filter(c => c.priority.total >= 4).length;
+      statsCounts = { total: callList.length, never, red, unpaid, highScore };
+      const endingCount = all.filter(c => !c.doNotContact && hasEndDate(c)).length;
       excludedCountEl.textContent = data.excludedCount || 0;
+      endingCountEl.textContent = endingCount;
       toggleExcludedBtn.style.display = data.excludedCount > 0 || showExcluded ? '' : 'none';
+      toggleEndingBtn.style.display = endingCount > 0 || showEnding ? '' : 'none';
       applyFilter();
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="11" class="state error">Failed to load: ${escape(err.message)}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9" class="state error">Failed to load: ${escape(err.message)}</td></tr>`;
     }
   }
 
   search.addEventListener('input', applyFilter);
   refreshBtn.addEventListener('click', load);
-  toggleRiskBtn.addEventListener('click', () => {
-    showRisk = !showRisk;
-    toggleRiskBtn.classList.toggle('active', showRisk);
-    toggleRiskBtn.title = showRisk ? 'Hide churn risk' : 'Show churn risk';
-    tableCard.classList.toggle('no-risk', !showRisk);
-    if (!showRisk && sortState.key === 'risk') {
-      sortState = { key: 'score', dir: 'desc' };
-      updateSortIndicators();
-    }
-    applyFilter();
-  });
 
   toggleExcludedBtn.addEventListener('click', () => {
     showExcluded = !showExcluded;
+    if (showExcluded) {
+      showEnding = false;
+      toggleEndingBtn.classList.remove('active');
+      toggleEndingBtn.title = 'Show customers with an end date set';
+    }
     toggleExcludedBtn.classList.toggle('active', showExcluded);
     toggleExcludedBtn.title = showExcluded
       ? 'Back to the call list'
       : 'Show customers excluded from the call list';
+    applyFilter();
+  });
+
+  toggleEndingBtn.addEventListener('click', () => {
+    showEnding = !showEnding;
+    if (showEnding) {
+      showExcluded = false;
+      toggleExcludedBtn.classList.remove('active');
+      toggleExcludedBtn.title = 'Show customers excluded from the call list';
+    }
+    toggleEndingBtn.classList.toggle('active', showEnding);
+    toggleEndingBtn.title = showEnding
+      ? 'Back to the call list'
+      : 'Show customers with an end date set';
     applyFilter();
   });
 

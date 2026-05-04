@@ -1298,6 +1298,7 @@ async function handleAnalyze(e) {
     else {
       // No image → still show variants against solid bg
       $('quickActions').classList.remove('hidden');
+      $('editorPanel').classList.remove('hidden');
       state._pendingVariants = false;
       showVariantPicker(4);
     }
@@ -1511,6 +1512,7 @@ async function selectImage(url) {
     renderPreview();
     if (changes.length) showToast(`Adjusted ${changes.join(' & ')} colour for readability`);
     $('quickActions').classList.remove('hidden');
+    $('editorPanel').classList.remove('hidden');
     if (state._pendingVariants) {
       state._pendingVariants = false;
       showVariantPicker(4);
@@ -1800,6 +1802,7 @@ function loadBanner(b) {
 
   // Saved banners keep their layout — skip variant picker, show quick actions + editor
   $('quickActions').classList.remove('hidden');
+  $('editorPanel').classList.remove('hidden');
   $('variantPanel').classList.add('hidden');
 
   // Re-sample image pixels so contrast helpers have fresh data after load

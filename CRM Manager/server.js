@@ -26,71 +26,47 @@ async function fetchPage(page) {
   return res.json();
 }
 
+function isDemoAccount(c) {
+  return /\bdemo\b/i.test(c.customerName || '');
+}
+
 async function fetchAll() {
   const first = await fetchPage(1);
   const totalPages = first.totalPages || 1;
-  if (totalPages === 1) return first.items;
-  const rest = await Promise.all(
-    Array.from({ length: totalPages - 1 }, (_, i) => fetchPage(i + 2))
-  );
-  return [first.items, ...rest.map(p => p.items)].flat();
+  const all = totalPages === 1
+    ? first.items
+    : [first.items, ...(await Promise.all(
+        Array.from({ length: totalPages - 1 }, (_, i) => fetchPage(i + 2))
+      )).map(p => p.items)].flat();
+  return all.filter(c => !isDemoAccount(c));
 }
 
-const WEIGHTS = { call: 35, satisfaction: 20, mrr: 10, invoice: 10, products: 18, binding: 7 };
-const MRR_CAP = 10_000;
-const MAX_PRODUCTS = 7;
+const MRR_THRESHOLD = 1000;
+const RENEWAL_DAYS = 90;
 
 function scoreCall(lastCallDate) {
-  if (!lastCallDate) return WEIGHTS.call;
+  if (!lastCallDate) return 1;
   const days = (Date.now() - new Date(lastCallDate).getTime()) / 86_400_000;
-  if (days >= 30) return Math.min(WEIGHTS.call, 30 + (days - 30) / 15);
-  return (days / 30) * 15;
+  return days > 90 ? 1 : 0;
 }
 
 function scoreSatisfaction(s) {
-  if (s === 'Red') return WEIGHTS.satisfaction;
-  if (s === 'Yellow') return 10;
-  if (s === 'Green') return 0;
-  return 2;
+  return s === 'Red' ? 1 : 0;
 }
 
 function scoreMRR(mrr) {
-  return Math.min(WEIGHTS.mrr, ((mrr || 0) / MRR_CAP) * WEIGHTS.mrr);
+  return (mrr || 0) < MRR_THRESHOLD ? 1 : 0;
 }
 
 function scoreInvoice(status) {
-  return status === 'has_unpaid' ? WEIGHTS.invoice : 0;
-}
-
-function scoreProducts(products) {
-  const n = Math.min(MAX_PRODUCTS, (products || []).length);
-  return WEIGHTS.products * (1 - n / MAX_PRODUCTS);
+  return status === 'has_unpaid' ? 1 : 0;
 }
 
 function scoreBinding(bindingPeriod) {
   const end = bindingPeriod && bindingPeriod.end;
   const active = end && new Date(end).getTime() > Date.now();
-  return active ? 0 : WEIGHTS.binding;
+  return active ? 0 : 1;
 }
-
-function scoreCustomer(c) {
-  const breakdown = {
-    call: scoreCall(c.lastCallDate),
-    satisfaction: scoreSatisfaction(c.satisfactionScore),
-    mrr: scoreMRR(c.mrr),
-    invoice: scoreInvoice(c.invoiceStatus),
-    products: scoreProducts(c.products),
-    binding: scoreBinding(c.bindingPeriod)
-  };
-  const total = Object.values(breakdown).reduce((s, v) => s + v, 0);
-  return { total: Math.round(total * 10) / 10, breakdown };
-}
-
-const RISK_WEIGHTS = {
-  activityDecline: 50,
-  recentZero: 30,
-  renewal: 20
-};
 
 function activityScore(mo) {
   return (mo.clicks || 0) + (mo.impressions || 0) / 100 + (mo.articleReads || 0) * 5;
@@ -106,49 +82,36 @@ function scoreActivityDecline(monthly) {
   const recent = m.slice(-3).reduce((s, x) => s + activityScore(x), 0) / 3;
   const previous = m.slice(-6, -3).reduce((s, x) => s + activityScore(x), 0) / 3;
   if (previous <= 0) return 0;
-  const drop = (previous - recent) / previous;
-  if (drop >= 0.5) return RISK_WEIGHTS.activityDecline;
-  if (drop >= 0.25) return 30;
-  if (drop >= 0.10) return 15;
-  return 0;
+  return recent < previous ? 1 : 0;
 }
 
-function scoreRecentZero(monthly) {
-  const m = sortMonthly(monthly);
-  if (!m.length) return 0;
-  const isZero = x => x && !(x.clicks || 0) && !(x.impressions || 0) && !(x.articleReads || 0);
-  const last = m[m.length - 1];
-  const prev = m[m.length - 2];
-  if (isZero(last) && isZero(prev)) return RISK_WEIGHTS.recentZero;
-  if (isZero(last)) return 18;
-  return 0;
-}
-
-function scoreRenewalRisk(endDate, bindingPeriod) {
+function scoreRenewal(endDate, bindingPeriod) {
   if (!endDate) return 0;
   const bindingEnd = bindingPeriod && bindingPeriod.end;
   const inBinding = bindingEnd && new Date(bindingEnd).getTime() > Date.now();
   if (inBinding) return 0;
   const days = (new Date(endDate).getTime() - Date.now()) / 86_400_000;
   if (days < 0) return 0;
-  if (days <= 60) return RISK_WEIGHTS.renewal;
-  if (days <= 180) return 10;
-  return 0;
+  return days <= RENEWAL_DAYS ? 1 : 0;
 }
 
-function churnRiskScore(c) {
+function scoreCustomer(c) {
   const breakdown = {
+    call: scoreCall(c.lastCallDate),
+    satisfaction: scoreSatisfaction(c.satisfactionScore),
+    mrr: scoreMRR(c.mrr),
+    invoice: scoreInvoice(c.invoiceStatus),
+    binding: scoreBinding(c.bindingPeriod),
     activityDecline: scoreActivityDecline(c.monthly),
-    recentZero: scoreRecentZero(c.monthly),
-    renewal: scoreRenewalRisk(c.endDate, c.bindingPeriod)
+    renewal: scoreRenewal(c.endDate, c.bindingPeriod)
   };
   const total = Object.values(breakdown).reduce((s, v) => s + v, 0);
-  return { total: Math.round(total * 10) / 10, breakdown };
+  return { total, breakdown };
 }
 
 function rankByContactPriority(customers) {
   return customers
-    .map(c => ({ ...c, priority: scoreCustomer(c), churnRisk: churnRiskScore(c) }))
+    .map(c => ({ ...c, priority: scoreCustomer(c) }))
     .sort((a, b) => b.priority.total - a.priority.total);
 }
 
