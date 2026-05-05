@@ -117,6 +117,151 @@ function scanFontRules(css, design) {
   }
 }
 
+// Walk CSS blocks once. Yields { selectors, body } for every rule we find.
+// Skips @font-face/@keyframes/@media wrappers — at-rules are handled by
+// stripping the wrapper and re-yielding their contents.
+function* walkCssRules(css) {
+  if (!css) return;
+  // Strip @font-face / @keyframes — useless for design tokens, and their
+  // bodies often contain values that confuse our property scanners.
+  const stripped = css
+    .replace(/@font-face\s*\{[^}]*\}/gi, '')
+    .replace(/@keyframes[^{]+\{(?:[^{}]|\{[^}]*\})*\}/gi, '');
+  // Naive but effective: match selector-block pairs at top level + inside
+  // @media wrappers (we don't care which media query the rule is in).
+  const blockRe = /([^{}@]+)\{([^{}]*)\}/g;
+  let m;
+  while ((m = blockRe.exec(stripped)) !== null) {
+    const selectors = m[1].trim();
+    const body = m[2];
+    if (!selectors || !body) continue;
+    yield { selectors, body };
+  }
+}
+
+function readDecl(body, prop) {
+  const re = new RegExp(`(?:^|[;{])\\s*${prop}\\s*:\\s*([^;}]+)`, 'i');
+  const m = re.exec(body);
+  return m ? m[1].trim() : null;
+}
+
+// Extract concrete CTA/button style tokens from CSS. We look at button-ish
+// selectors and capture their declared styles — far more reliable than asking
+// Claude to guess "what radius would Stripe use".
+function extractCtaStyle(css) {
+  if (!css) return null;
+  // Selectors ranked from most-specific (likely the brand's primary button)
+  // to least. First match wins per property.
+  const patterns = [
+    /(?:^|[\s,>+~])\.btn-primary\b/i,
+    /(?:^|[\s,>+~])\.button-primary\b/i,
+    /(?:^|[\s,>+~])\.btn--primary\b/i,
+    /(?:^|[\s,>+~])\.cta\b/i,
+    /(?:^|[\s,>+~])\.cta-button\b/i,
+    /(?:^|[\s,>+~])\.button\b/i,
+    /(?:^|[\s,>+~])\.btn\b/i,
+    /(?:^|[\s,>+~])button(?:\s|,|$|\.|\[|:)/i,
+  ];
+  const result = {};
+  const props = ['background-color', 'background', 'color', 'border-radius',
+                 'font-weight', 'text-transform', 'letter-spacing', 'padding'];
+  for (const pattern of patterns) {
+    for (const { selectors, body } of walkCssRules(css)) {
+      if (!pattern.test(selectors)) continue;
+      // Skip pseudo-state declarations — they describe interaction, not the
+      // canonical brand button.
+      if (/:(hover|focus|active|disabled|focus-visible|focus-within)/.test(selectors)) continue;
+      for (const prop of props) {
+        const key = prop.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+        if (result[key]) continue;
+        const val = readDecl(body, prop);
+        if (!val) continue;
+        // For background, only keep if it's a plain colour (skip gradients/images for now)
+        if (prop === 'background' && !/^(#|rgb|hsl|[a-z]+$)/i.test(val)) continue;
+        result[key] = val;
+      }
+    }
+  }
+  // Promote `background` to `backgroundColor` if the latter wasn't found and
+  // background looks like a plain colour.
+  if (!result.backgroundColor && result.background && /^#|^rgb|^hsl/i.test(result.background)) {
+    result.backgroundColor = result.background;
+  }
+  return Object.keys(result).length ? result : null;
+}
+
+// Heading style signature — brands have characteristic h1/h2 typography
+// (think: Apple's tight tracking, Stripe's heavy weight, MailChimp's caps).
+function extractHeadingStyle(css) {
+  if (!css) return null;
+  const result = {};
+  const props = ['font-weight', 'text-transform', 'letter-spacing', 'font-style', 'line-height'];
+  const headingSelector = /(?:^|[\s,>+~])(h1|h2)\b|\.(hero[\w-]*title|hero[\w-]*heading|display|headline|banner-?title|page-?title)\b/i;
+  for (const { selectors, body } of walkCssRules(css)) {
+    if (!headingSelector.test(selectors)) continue;
+    if (/:(hover|focus|active|disabled)/.test(selectors)) continue;
+    for (const prop of props) {
+      const key = prop.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+      if (result[key]) continue;
+      const val = readDecl(body, prop);
+      if (val) result[key] = val;
+    }
+  }
+  return Object.keys(result).length ? result : null;
+}
+
+// Weighted colour palette — counts each colour's appearances and tags whether
+// it shows up as background / text / border / accent. Far better than the
+// raw "set of all hex codes that appear in the CSS" approach.
+function extractWeightedPalette(css) {
+  if (!css) return [];
+  const stats = new Map(); // hex → { count, bg, text, border, accent }
+  const bump = (hex, role) => {
+    const k = hex.toLowerCase();
+    const r = stats.get(k) || { count: 0, bg: 0, text: 0, border: 0, accent: 0 };
+    r.count++;
+    r[role]++;
+    stats.set(k, r);
+  };
+
+  for (const { body } of walkCssRules(css)) {
+    // background / background-color
+    for (const m of body.matchAll(/background(?:-color)?\s*:[^;}]*?(#[0-9a-f]{6})\b/gi)) bump(m[1], 'bg');
+    // color (text)
+    for (const m of body.matchAll(/(?:^|[;{])\s*color\s*:[^;}]*?(#[0-9a-f]{6})\b/gi)) bump(m[1], 'text');
+    // border / outline
+    for (const m of body.matchAll(/(?:border|outline)(?:-(?:top|right|bottom|left|color))?\s*:[^;}]*?(#[0-9a-f]{6})\b/gi)) bump(m[1], 'border');
+    // accent-color, fill, stroke
+    for (const m of body.matchAll(/(?:accent-color|fill|stroke)\s*:[^;}]*?(#[0-9a-f]{6})\b/gi)) bump(m[1], 'accent');
+  }
+
+  return [...stats.entries()]
+    .filter(([hex]) => {
+      if (hex === '#ffffff' || hex === '#000000') return false;
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+      return brightness > 18 && brightness < 240;
+    })
+    .map(([hex, m]) => ({ hex, ...m }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+}
+
+// Detect site theme (light vs dark) from body/html background.
+function detectThemeBg(css) {
+  for (const { selectors, body } of walkCssRules(css)) {
+    if (!/^(body|html)\b|(?:^|[\s,>+~])(body|html)\b/.test(selectors.toLowerCase())) continue;
+    const bg = readDecl(body, 'background-color') || readDecl(body, 'background');
+    if (bg && /^#[0-9a-f]{6}\b/i.test(bg)) {
+      const m = bg.match(/^#[0-9a-f]{6}\b/i);
+      if (m) return m[0].toLowerCase();
+    }
+  }
+  return null;
+}
+
 function extractDesignData($, extraCss = '') {
   const design = {
     themeColor: '',
@@ -125,6 +270,10 @@ function extractDesignData($, extraCss = '') {
     dominantColors: [],
     bodyFont: '',
     headlineFont: '',
+    ctaStyle: null,           // { backgroundColor, color, borderRadius, fontWeight, textTransform, letterSpacing, padding }
+    headingStyle: null,       // { fontWeight, textTransform, letterSpacing, fontStyle, lineHeight }
+    palette: [],              // [{ hex, count, bg, text, border, accent }]
+    themeBg: null,            // hex of body background, if detected
   };
 
   design.themeColor = $('meta[name="theme-color"]').attr('content') || '';
@@ -187,6 +336,14 @@ function extractDesignData($, extraCss = '') {
       return brightness > 25 && brightness < 230;
     })
     .slice(0, 20);
+
+  // Concrete style tokens — bypass Claude's guesswork by reading the site's
+  // actual button/heading rules and ranking colours by usage.
+  const allCssJoined = [...cssChunks].join('\n');
+  design.ctaStyle = extractCtaStyle(allCssJoined);
+  design.headingStyle = extractHeadingStyle(allCssJoined);
+  design.palette = extractWeightedPalette(allCssJoined);
+  design.themeBg = detectThemeBg(allCssJoined);
 
   return design;
 }
@@ -477,7 +634,11 @@ app.post('/api/analyze', async (req, res) => {
     let images = [];
     let logos = [];
     let title = '';
-    let design = { themeColor: '', googleFonts: [], cssVars: {}, dominantColors: [], bodyFont: '', headlineFont: '' };
+    let design = {
+      themeColor: '', googleFonts: [], cssVars: {}, dominantColors: [],
+      bodyFont: '', headlineFont: '',
+      ctaStyle: null, headingStyle: null, palette: [], themeBg: null,
+    };
 
     // Website is the primary source when present
     if (websiteUrl) {
@@ -503,14 +664,45 @@ app.post('/api/analyze', async (req, res) => {
 
     // Build design context for Claude (may be empty if no website was analysed)
     const cssVarLines = Object.entries(design.cssVars).map(([k, v]) => `  ${k}: ${v}`).join('\n') || '  (none found)';
+
+    // Weighted palette tells Claude which colours are LOAD-BEARING (used for
+    // backgrounds vs. text vs. accents) instead of just listing every hex.
+    const paletteLines = design.palette.length
+      ? design.palette.slice(0, 6).map((p) => {
+          const roles = [];
+          if (p.bg)     roles.push(`${p.bg}× as background`);
+          if (p.text)   roles.push(`${p.text}× as text`);
+          if (p.border) roles.push(`${p.border}× as border`);
+          if (p.accent) roles.push(`${p.accent}× as accent`);
+          return `  ${p.hex} — ${roles.join(', ') || `${p.count} appearances`}`;
+        }).join('\n')
+      : '  (none found)';
+
+    const ctaLines = design.ctaStyle
+      ? Object.entries(design.ctaStyle).map(([k, v]) => `  ${k}: ${v}`).join('\n')
+      : '  (no button styles detected)';
+
+    const headingLines = design.headingStyle
+      ? Object.entries(design.headingStyle).map(([k, v]) => `  ${k}: ${v}`).join('\n')
+      : '  (no heading styles detected)';
+
     const designContext = `
 === DESIGN DATA EXTRACTED FROM THE PAGE ===
 Theme-color meta tag: ${design.themeColor || '(not set)'}
+Body background:      ${design.themeBg || '(not detected — assume light)'}
 Google Fonts in use:  ${design.googleFonts.length ? design.googleFonts.join(', ') : '(none detected)'}
 Body/primary font:    ${design.bodyFont || '(not detected)'}
 Headline font:        ${design.headlineFont || '(same as body)'}
-CSS brand colours (mid-range, filtered):
-  ${design.dominantColors.join(', ') || '(none found)'}
+
+Weighted brand palette (most-used → least, by role):
+${paletteLines}
+
+CTA / primary button rule extracted from CSS:
+${ctaLines}
+
+Heading style signature (from h1/h2/.hero rules):
+${headingLines}
+
 CSS custom properties (colour vars only):
 ${cssVarLines}`.trim();
 
@@ -551,13 +743,15 @@ ${combinedText || '(no textual content available — rely on BRAND HINT)'}
 ${designContext}
 
 Field rules:
-- primaryColor: the colour for body/headline text on the banner. Use white (#ffffff) if the site uses dark backgrounds, or a dark colour if the site is light.
-- secondaryColor: the site's accent/highlight colour (look for it in CSS vars or dominant colours).
-- overlayColor: a dark colour from the palette to use as the image overlay; if none found use #000000.
-- ctaColor: the site's primary action/button colour extracted from the CSS; fall back to secondaryColor.
+- primaryColor: the colour for body/headline text on the banner. Use white (#ffffff) when the banner image/background is dark; use a dark colour from the palette when the banner area is light.
+- secondaryColor: the site's accent/highlight colour. Strong signal: a high-count colour in the weighted palette that appears as accent/border/text on hero elements.
+- overlayColor: a dark colour from the palette to use as the image overlay; default #000000 if none found.
+- ctaColor: PREFER the extracted CTA background-color from the CSS rule above if present (it's the literal button colour the site already uses). Otherwise use the most-used "background" role colour from the weighted palette. Last resort: secondaryColor.
 - fontFamily: the EXACT body/primary font-family name detected from the page (Google Font name or web-safe font). If none detected, pick a Google Font that matches the brand personality.
 - headlineFont: the EXACT headline font detected (from h1/h2/.hero/.title CSS rules). If none detected or same as fontFamily, return "".
 - overlayOpacity: between 0.30 and 0.60 — lower if the site has a clean/minimal feel, higher for dramatic.
+
+Quality bar: if the extracted CTA rule shows e.g. "background: #2563eb, border-radius: 999px, font-weight: 600", that means the brand uses a blue pill-shaped semibold button. Reflect that personality in your colour choices — don't pick a contrasting accent that fights the brand.
 
 Return ONLY a valid JSON object — no markdown, no explanation:
 {
@@ -610,7 +804,18 @@ Return ONLY a valid JSON object — no markdown, no explanation:
       };
     }
 
-    res.json({ analysis, images, logos });
+    // designTokens are concrete CSS values lifted from the page — the frontend
+    // applies them directly to the banner (border-radius, font-weight, button
+    // colour) without round-tripping through Claude. They're authoritative
+    // when present.
+    const designTokens = {
+      ctaStyle: design.ctaStyle,
+      headingStyle: design.headingStyle,
+      palette: design.palette,
+      themeBg: design.themeBg,
+    };
+
+    res.json({ analysis, images, logos, designTokens });
   } catch (err) {
     console.error('Analyze error:', err);
     res.status(500).json({ error: err.message });

@@ -90,6 +90,10 @@ const state = {
   // these maps fall back to state.primaryColor / state.textAlign.
   elementColors: {},
   elementTextAligns: {},
+  // Brand-locked CTA tokens lifted from the customer's CSS — survives
+  // shuffleLayout so the brand's button silhouette/colour persists across
+  // layout swaps. Cleared on resetBanner.
+  brandTokens: null,
   // Persistence
   currentBannerId: null,
   bannerName: '',
@@ -368,6 +372,11 @@ async function shuffleLayout() {
     ctaPaddingV:     style.cta.padV,
     ctaPaddingH:     style.cta.padH,
   });
+
+  // Restore brand-locked CTA tokens — shuffleLayout shouldn't change the
+  // brand's button silhouette/colour. Padding and font-size stay variant-
+  // driven since they're proportional to the banner.
+  if (state.brandTokens) Object.assign(state, state.brandTokens);
 
   // Compute zones (if any) up-front so renderPreview can draw zone bgs and
   // isElementVisible correctly filters out unassigned elements.
@@ -1231,7 +1240,7 @@ async function handleAnalyze(e) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Analysis failed');
 
-    const { analysis, images, logos = [] } = data;
+    const { analysis, images, logos = [], designTokens = null } = data;
 
     // Apply Claude's suggestions to state
     Object.assign(state, {
@@ -1278,6 +1287,11 @@ async function handleAnalyze(e) {
       state.images.unshift({ url: imageUrl, base64: null });
       images.unshift(imageUrl);
     }
+
+    // Override Claude's guesses with concrete CSS tokens lifted from the page.
+    // The site's actual button radius / weight / colour beats anything Claude
+    // can infer from text alone.
+    applyDesignTokens(designTokens);
 
     // First pass: fix contrast against bgColor fallback (will re-check once
     // an image is selected, since the avg image colour may differ)
@@ -1592,6 +1606,7 @@ async function handleSave() {
     zones: state.zones,
     elementColors: state.elementColors,
     elementTextAligns: state.elementTextAligns,
+    brandTokens: state.brandTokens || null,
   };
 
   try {
@@ -1787,6 +1802,7 @@ function loadBanner(b) {
     zones:               b.zones             ? JSON.parse(JSON.stringify(b.zones))             : [],
     elementColors:       b.elementColors     ? { ...b.elementColors }     : {},
     elementTextAligns:   b.elementTextAligns ? { ...b.elementTextAligns } : {},
+    brandTokens:         b.brandTokens || null,
   });
 
   // If saved banner had images, populate grid too
@@ -1879,6 +1895,7 @@ function resetBanner() {
     zones: [],
     elementColors: {},
     elementTextAligns: {},
+    brandTokens: null,
   });
   populateEditors();
   renderPreview();
@@ -1970,6 +1987,100 @@ function isHex(val) {
 
 function clamp(n, min, max) {
   return Math.min(Math.max(n, min), max);
+}
+
+// Parse a CSS length value into pixels. Handles px / em / rem / % and the
+// pill-shape sentinels (50%, 999px, 9999px) — those collapse to a sane max
+// since we're applying to a banner CTA, not the whole page.
+function parseCssLengthToPx(val, basePx = 14) {
+  if (typeof val !== 'string') return null;
+  const v = val.trim().toLowerCase();
+  // Pill-shape — anything ≥ 50% or ≥ 100px reads as fully rounded for our
+  // purposes (banner CTA radius slider caps at 50).
+  if (/^\d+(?:\.\d+)?%$/.test(v) && parseFloat(v) >= 50) return 50;
+  if (v === '50%') return 50;
+  const m = v.match(/^(-?\d+(?:\.\d+)?)(px|rem|em|%)?$/);
+  if (!m) return null;
+  const n = parseFloat(m[1]);
+  const unit = m[2] || 'px';
+  if (unit === 'px') return Math.min(50, Math.max(0, Math.round(n)));
+  if (unit === 'rem' || unit === 'em') return Math.min(50, Math.max(0, Math.round(n * basePx)));
+  if (unit === '%') return Math.min(50, Math.round(n));
+  return null;
+}
+
+// Normalize a CSS font-weight value to the string keys our select uses.
+function parseCssFontWeight(val) {
+  if (typeof val !== 'string') return null;
+  const v = val.trim().toLowerCase();
+  const named = { normal: '400', bold: '700', lighter: '300', bolder: '800' };
+  if (named[v]) return named[v];
+  if (/^\d{3}$/.test(v)) {
+    // Snap to nearest weight key the editor offers.
+    const n = parseInt(v, 10);
+    const choices = [400, 600, 700, 800, 900];
+    return String(choices.reduce((a, b) => (Math.abs(b - n) < Math.abs(a - n) ? b : a)));
+  }
+  return null;
+}
+
+// Apply concrete design tokens lifted from the customer's CSS to state.
+// These are AUTHORITATIVE over Claude's analysis — we extracted real numbers
+// and colours from the brand's stylesheet. Only fields we successfully parse
+// override state; everything else passes through untouched.
+//
+// Locked tokens (ctaBorderRadius, ctaFontWeight, ctaColor) are the brand's
+// button identity — we stash them on state.brandTokens so shuffleLayout can
+// restore them after a layout-style swap.
+function applyDesignTokens(tokens) {
+  if (!tokens) {
+    state.brandTokens = null;
+    return;
+  }
+  const cta = tokens.ctaStyle || {};
+  const heading = tokens.headingStyle || {};
+  const locked = {};
+
+  // CTA background → state.ctaColor (this is the literal button colour).
+  const ctaBg = parseCssColorToHex(cta.backgroundColor || cta.background);
+  if (ctaBg) { state.ctaColor = ctaBg; locked.ctaColor = ctaBg; }
+
+  // CTA text colour
+  const ctaText = parseCssColorToHex(cta.color);
+  if (ctaText) { state.ctaTextColor = ctaText; locked.ctaTextColor = ctaText; }
+
+  // CTA border-radius — defines the brand's button silhouette (sharp/rounded/pill)
+  const ctaRadius = parseCssLengthToPx(cta.borderRadius);
+  if (ctaRadius !== null) { state.ctaBorderRadius = ctaRadius; locked.ctaBorderRadius = ctaRadius; }
+
+  // CTA font-weight
+  const ctaWeight = parseCssFontWeight(cta.fontWeight);
+  if (ctaWeight) { state.ctaFontWeight = ctaWeight; locked.ctaFontWeight = ctaWeight; }
+
+  // Heading weight — only override if the site uses a non-default weight
+  const headWeight = parseCssFontWeight(heading.fontWeight);
+  if (headWeight) { state.headlineWeight = headWeight; locked.headlineWeight = headWeight; }
+
+  state.brandTokens = Object.keys(locked).length ? locked : null;
+}
+
+// Pull a hex colour out of a CSS colour value. Accepts #hex, rgb(), rgba()
+// (alpha is dropped), and the named colours we care about. Returns null for
+// gradients or anything we can't reduce to a single solid hex.
+function parseCssColorToHex(val) {
+  if (typeof val !== 'string') return null;
+  const v = val.trim();
+  if (/gradient|var\(|url\(/i.test(v)) return null;
+  const hex = v.match(/#[0-9a-f]{6}\b/i);
+  if (hex) return hex[0].toLowerCase();
+  const short = v.match(/#([0-9a-f])([0-9a-f])([0-9a-f])\b/i);
+  if (short) return ('#' + short[1] + short[1] + short[2] + short[2] + short[3] + short[3]).toLowerCase();
+  const rgb = v.match(/rgba?\(\s*(\d+)\s*[, ]\s*(\d+)\s*[, ]\s*(\d+)/i);
+  if (rgb) {
+    const toHex = (n) => Number(n).toString(16).padStart(2, '0');
+    return ('#' + toHex(rgb[1]) + toHex(rgb[2]) + toHex(rgb[3])).toLowerCase();
+  }
+  return null;
 }
 
 function rgbToHex({ r, g, b }) {
