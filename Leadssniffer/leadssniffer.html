@@ -1,0 +1,1334 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Leadssniffer · Vores Digital</title>
+  <style>
+    :root {
+      --bg: #faf7f2;
+      --panel: #ffffff;
+      --ink: #2b2521;
+      --muted: #7a6e66;
+      --line: #ece4da;
+      --accent: #c2410c;
+      --accent-soft: #fff1ea;
+      --lead: #166534;
+      --lead-soft: #e7f5ec;
+      --spam: #b91c1c;
+      --spam-soft: #fdecec;
+      --warn: #b45309;
+      --warn-soft: #fdf3e0;
+      --press: #1d4ed8;
+      --press-soft: #e6efff;
+      --opsig: #92400e;
+      --opsig-soft: #fef3c7;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+    h1 { font-size: 18px; margin: 0; font-weight: 600; }
+    h1 small { color: var(--muted); font-weight: 400; margin-left: 8px; }
+    .meta { color: var(--muted); font-size: 12px; }
+    button {
+      background: var(--accent);
+      color: white;
+      border: 0;
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    button:hover { filter: brightness(0.95); }
+    button.ghost {
+      background: transparent;
+      color: var(--ink);
+      border: 1px solid var(--line);
+    }
+    .stats {
+      display: flex;
+      gap: 12px;
+      padding: 16px 24px;
+      flex-wrap: wrap;
+    }
+    .stat {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 16px;
+      min-width: 120px;
+    }
+    .stat .num { font-size: 22px; font-weight: 600; }
+    .stat .lbl { color: var(--muted); font-size: 12px; }
+    .stat.clickable { cursor: pointer; transition: transform 0.1s ease, box-shadow 0.1s ease, border-color 0.1s ease; }
+    .stat.clickable:hover { transform: translateY(-1px); border-color: var(--ink); box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+    .stat.lead .num { color: var(--lead); }
+    .stat.spam .num { color: var(--spam); }
+    .stat.warn .num { color: var(--warn); }
+    .stat.opsig .num { color: var(--opsig); }
+
+    main {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      padding: 0 24px 24px;
+    }
+    @media (max-width: 1100px) { main { grid-template-columns: 1fr; } }
+
+    .col {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .col h2 {
+      margin: 0;
+      padding: 14px 18px;
+      font-size: 14px;
+      font-weight: 600;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .bulk-btn {
+      margin-left: auto;
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .bulk-btn:hover {
+      background: var(--spam-soft);
+      color: var(--spam);
+      border-color: var(--spam);
+    }
+    .bulk-btn.lead:hover {
+      background: var(--lead-soft);
+      color: var(--lead);
+      border-color: var(--lead);
+    }
+    .col.leads h2 { background: var(--lead-soft); color: var(--lead); }
+    .col.spam h2 { background: var(--spam-soft); color: var(--spam); }
+    .col.usikker h2 { background: var(--warn-soft); color: var(--warn); }
+    .col.press { grid-column: 1 / -1; }
+    .col.press h2 { background: var(--press-soft); color: var(--press); }
+    .col.opsig { grid-column: 1 / -1; }
+    .col.opsig h2 { background: var(--opsig-soft); color: var(--opsig); }
+
+    .tabs { padding: 8px 18px 0; display: flex; gap: 6px; border-bottom: 1px solid var(--line); }
+    .tab {
+      padding: 6px 10px;
+      background: transparent;
+      color: var(--muted);
+      border: 0;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .tab.active { color: var(--ink); border-color: var(--accent); }
+
+    .ticket {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--line);
+      cursor: pointer;
+      position: relative;
+    }
+    .ticket:last-child { border-bottom: 0; }
+    .ticket:hover { background: #fbf8f3; }
+    .ticket .row { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+    .ticket .subj { font-weight: 600; flex: 1; }
+    .ticket .archive-btn {
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.15s ease, background 0.15s ease;
+    }
+    .ticket:hover .archive-btn { opacity: 1; }
+    .ticket .archive-btn:hover {
+      background: var(--spam-soft);
+      color: var(--spam);
+      border-color: var(--spam);
+    }
+    .ticket .archive-btn:disabled { cursor: not-allowed; }
+    .ticket .move-select {
+      font-size: 11px;
+      padding: 3px 6px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      color: var(--muted);
+      background: white;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+    }
+    .ticket:hover .move-select { opacity: 1; }
+    .ticket .move-select:hover { color: var(--ink); border-color: var(--ink); }
+    .ticket .ticket-actions { display: flex; gap: 6px; align-items: center; }
+    .manual-tag {
+      display: inline-block;
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      background: #e0e7ff;
+      color: #3730a3;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      margin-left: 6px;
+    }
+    .ticket .from { color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .ticket .body { color: var(--muted); font-size: 13px; margin-top: 6px; }
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .badge.lead { background: var(--lead-soft); color: var(--lead); }
+    .badge.spam { background: var(--spam-soft); color: var(--spam); }
+    .badge.warn { background: var(--warn-soft); color: var(--warn); }
+    .badge.press { background: var(--press-soft); color: var(--press); }
+    .badge.opsig { background: var(--opsig-soft); color: var(--opsig); }
+
+    .reasons { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+    .reason {
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: #f4ede4;
+      color: var(--muted);
+    }
+    .reason.lead { background: var(--lead-soft); color: var(--lead); }
+    .reason.spam { background: var(--spam-soft); color: var(--spam); }
+    .reason.press { background: var(--press-soft); color: var(--press); }
+    .reason.opsig { background: var(--opsig-soft); color: var(--opsig); }
+    .reason.llm { background: #efe7fb; color: #6d28d9; }
+    .llm-tag {
+      display: inline-block;
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      background: #efe7fb;
+      color: #6d28d9;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      margin-left: 6px;
+    }
+    .cat-tag {
+      display: inline-block;
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      background: var(--spam-soft);
+      color: var(--spam);
+      font-weight: 500;
+      margin-left: 6px;
+    }
+
+    .empty { padding: 32px 18px; color: var(--muted); text-align: center; font-size: 13px; }
+    .err {
+      margin: 16px 24px;
+      padding: 12px 16px;
+      background: var(--spam-soft);
+      color: var(--spam);
+      border-radius: 8px;
+      border: 1px solid #f5b5b5;
+    }
+
+    dialog {
+      border: 0;
+      border-radius: 12px;
+      max-width: 720px;
+      width: 90%;
+      padding: 0;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+    dialog::backdrop { background: rgba(0,0,0,0.4); }
+    dialog header {
+      position: static;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--line);
+    }
+    dialog .body {
+      padding: 20px;
+      max-height: 60vh;
+      overflow: auto;
+      white-space: pre-wrap;
+      font-size: 13px;
+      color: var(--ink);
+    }
+    dialog footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 20px;
+      border-top: 1px solid var(--line);
+      background: #fbf8f3;
+    }
+    a { color: var(--accent); }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--ink);
+      color: white;
+      padding: 12px 18px;
+      border-radius: 8px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+      font-size: 13px;
+      z-index: 100;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.2s, transform 0.2s;
+      pointer-events: none;
+    }
+    .toast.visible { opacity: 1; transform: translateY(0); }
+    .toast.error { background: var(--spam); }
+
+    #archive-dialog .body { padding: 16px 20px; max-height: 50vh; }
+    #archive-dialog .preview-list { margin-top: 10px; padding-left: 18px; color: var(--muted); font-size: 12px; }
+    #archive-dialog .preview-list li { margin-bottom: 4px; }
+    #archive-dialog .danger {
+      background: var(--spam);
+      color: white;
+    }
+    #archive-dialog .block-row {
+      margin-top: 14px;
+      padding: 10px 12px;
+      background: #fbf8f3;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+    }
+    #archive-dialog .block-row input { width: 16px; height: 16px; cursor: pointer; }
+    #archive-dialog .block-row label { cursor: pointer; }
+    #archive-dialog .scope-row {
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      background: #fbf8f3;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    #archive-dialog .scope-row .scope-title {
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: var(--ink);
+    }
+    #archive-dialog .scope-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0;
+      cursor: pointer;
+    }
+    #archive-dialog .scope-option input { cursor: pointer; }
+    #archive-dialog .scope-option .scope-label { flex: 1; }
+    #archive-dialog .scope-option .scope-count {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    #blocklist-dialog .body { padding: 16px 20px; max-height: 50vh; }
+    #blocklist-dialog .bl-list { list-style: none; padding: 0; margin: 0; }
+    #blocklist-dialog .bl-list li {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 4px; border-bottom: 1px solid var(--line); font-size: 13px;
+    }
+    #blocklist-dialog .bl-list li:last-child { border-bottom: 0; }
+    #blocklist-dialog .bl-list .unblock {
+      background: transparent; border: 1px solid var(--line); color: var(--muted);
+      padding: 3px 8px; font-size: 11px; border-radius: 4px; cursor: pointer;
+    }
+    #blocklist-dialog .bl-list .unblock:hover { color: var(--ink); border-color: var(--ink); }
+    #blocklist-dialog .bl-section-title {
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--muted); margin: 14px 0 6px;
+    }
+    #blocklist-dialog .empty { color: var(--muted); font-style: italic; padding: 6px 4px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Leadssniffer <small id="hdr-sub">Vores Digital</small></h1>
+    <div style="flex:1"></div>
+    <div class="meta" id="meta"></div>
+    <button id="show-blocklist" class="ghost">Blokliste</button>
+    <button id="refresh">Opdater</button>
+  </header>
+
+  <div id="err" class="err" hidden></div>
+
+  <div class="stats" id="stats"></div>
+
+  <main>
+    <section class="col leads">
+      <h2>
+        Leads <span class="badge lead" id="cnt-leads">0</span>
+        <span style="display:flex;gap:6px;margin-left:auto">
+          <button class="bulk-btn lead" id="forward-leads-btn" title="Send alle leads til den konfigurerede email-modtager">📧 Send leads</button>
+          <button class="bulk-btn" data-bulk="lead" title="Arkivér alle leads">🗑 Arkivér alle</button>
+        </span>
+      </h2>
+      <div id="list-leads"></div>
+    </section>
+    <section class="col spam">
+      <h2>
+        Spam <span class="badge spam" id="cnt-spam">0</span>
+        <button class="bulk-btn" data-bulk="spam" data-block-default="true" title="Arkivér alle spam-tickets og bloker afsenderne">🗑 Tøm + bloker</button>
+      </h2>
+      <div id="list-spam"></div>
+    </section>
+    <section class="col opsig">
+      <h2>
+        Opsigelser <span class="badge opsig" id="cnt-opsig">0</span>
+        <span style="display:flex;gap:6px;margin-left:auto">
+          <button class="bulk-btn" id="opsig-move-btn" title="Flyt alle opsigelser til Intern Support / New pipeline">↪ Flyt til Intern Support</button>
+          <button class="bulk-btn" data-bulk="opsigelse" title="Arkivér alle opsigelser">🗑 Arkivér alle</button>
+        </span>
+      </h2>
+      <div id="list-opsig"></div>
+    </section>
+    <section class="col usikker">
+      <h2>
+        Andre henvendelser <span class="badge warn" id="cnt-usikker">0</span>
+        <button class="bulk-btn" data-bulk="usikker" title="Arkivér alle andre henvendelser">🗑 Arkivér alle</button>
+      </h2>
+      <div id="list-usikker"></div>
+    </section>
+    <section class="col press">
+      <h2>
+        Pressemeddelelser <span class="badge press" id="cnt-press">0</span>
+        <span style="display:flex;gap:6px;margin-left:auto">
+          <button class="bulk-btn" id="press-handle-btn" title="Send #pm-snippet til hver afsender, arkivér tickets og bloker afsenderne">📨 Send #pm + arkivér + bloker</button>
+          <button class="bulk-btn" data-bulk="pressemeddelelse" title="Arkivér alle pressemeddelelser">🗑 Arkivér alle</button>
+        </span>
+      </h2>
+      <div id="list-press"></div>
+    </section>
+  </main>
+
+  <dialog id="detail">
+    <header>
+      <h1 id="d-subj">—</h1>
+      <div class="meta" id="d-meta"></div>
+    </header>
+    <div class="body" id="d-body"></div>
+    <footer>
+      <div id="d-reasons" class="reasons"></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button id="d-clear-manual" class="ghost" style="display:none">Fjern manuel flytning</button>
+        <a id="d-link" href="#" target="_blank"><button class="ghost">Åbn i HubSpot</button></a>
+        <button id="d-close">Luk</button>
+      </div>
+    </footer>
+  </dialog>
+
+  <dialog id="archive-dialog">
+    <header>
+      <h1>Arkivér tickets fra afsender</h1>
+      <div class="meta" id="a-meta"></div>
+    </header>
+    <div class="body">
+      <div class="scope-row">
+        <div class="scope-title">Hvad skal arkiveres?</div>
+        <label class="scope-option">
+          <input type="radio" name="a-scope" value="email" checked />
+          <span class="scope-label" id="a-scope-email-label">Email</span>
+          <span class="scope-count" id="a-scope-email-count">…</span>
+        </label>
+        <label class="scope-option">
+          <input type="radio" name="a-scope" value="domain" />
+          <span class="scope-label" id="a-scope-domain-label">Hele domænet</span>
+          <span class="scope-count" id="a-scope-domain-count">…</span>
+        </label>
+      </div>
+      <div id="a-summary"></div>
+      <ul id="a-preview" class="preview-list"></ul>
+      <div class="block-row">
+        <input type="checkbox" id="a-block" />
+        <label for="a-block">🚫 Bloker også afsenderen — fremtidige tickets arkiveres automatisk</label>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin-top:14px">
+        Tickets arkiveres i HubSpot og kan gendannes i op til 90 dage via Recycle Bin.
+      </p>
+    </div>
+    <footer>
+      <div></div>
+      <div style="display:flex;gap:8px">
+        <button id="a-cancel" class="ghost">Annullér</button>
+        <button id="a-confirm" class="danger">Arkivér</button>
+      </div>
+    </footer>
+  </dialog>
+
+  <dialog id="forward-leads-dialog">
+    <header>
+      <h1>Send leads via email</h1>
+      <div class="meta" id="fl-meta"></div>
+    </header>
+    <div class="body">
+      <div id="fl-summary"></div>
+      <ul id="fl-preview" class="preview-list"></ul>
+      <p id="fl-warning" style="font-size:12px;color:var(--spam);margin-top:14px;display:none"></p>
+      <p style="font-size:12px;color:var(--muted);margin-top:14px">
+        Hver lead sendes som sin egen mail via Vores Digitals interne email-API.
+        Successfully-sendte tickets flyttes til stage "Closed" i HubSpot (ikke arkiveret —
+        så HubSpot-linket i mailen stadig virker når modtageren klikker det).
+        Fejlede sends flyttes ikke, så du kan trygt retry.
+      </p>
+    </div>
+    <footer>
+      <div></div>
+      <div style="display:flex;gap:8px">
+        <button id="fl-cancel" class="ghost">Annullér</button>
+        <button id="fl-confirm">Send</button>
+      </div>
+    </footer>
+  </dialog>
+
+  <dialog id="opsig-dialog">
+    <header>
+      <h1>Flyt opsigelser til Intern Support</h1>
+      <div class="meta">Tickets flyttes til pipelinen "Intern Support", stage "New"</div>
+    </header>
+    <div class="body">
+      <div id="om-summary"></div>
+      <ul id="om-preview" class="preview-list"></ul>
+      <p style="font-size:12px;color:var(--muted);margin-top:14px">
+        Tickets bliver IKKE arkiveret — de flyttes blot til en anden pipeline,
+        så internt team kan håndtere dem. HubSpot-linksene i evt. mails virker
+        fortsat, og tickets'ne kan stadig findes i HubSpot.
+      </p>
+    </div>
+    <footer>
+      <div></div>
+      <div style="display:flex;gap:8px">
+        <button id="om-cancel" class="ghost">Annullér</button>
+        <button id="om-confirm">Flyt</button>
+      </div>
+    </footer>
+  </dialog>
+
+  <dialog id="press-dialog">
+    <header>
+      <h1>Send #pm-snippet til pressemeddelelses-afsendere</h1>
+      <div class="meta" id="ph-meta"></div>
+    </header>
+    <div class="body">
+      <div id="ph-summary"></div>
+      <ul id="ph-preview" class="preview-list"></ul>
+      <p id="ph-warning" style="font-size:12px;color:var(--spam);margin-top:14px;display:none"></p>
+      <p style="font-size:12px;color:var(--muted);margin-top:14px">
+        For hver unik afsender sendes <strong>én</strong> mail med #pm-snippetten (fra <code>pm-template.json</code>).
+        Bagefter arkiveres alle deres pressemeddelelser, og deres email tilføjes til bloklisten — fremtidige tickets fra dem auto-arkiveres.
+      </p>
+    </div>
+    <footer>
+      <div></div>
+      <div style="display:flex;gap:8px">
+        <button id="ph-cancel" class="ghost">Annullér</button>
+        <button id="ph-confirm" class="danger">Send</button>
+      </div>
+    </footer>
+  </dialog>
+
+  <dialog id="bulk-archive-dialog">
+    <header>
+      <h1 id="bs-title">Arkivér alle</h1>
+      <div class="meta" id="bs-subtitle"></div>
+    </header>
+    <div class="body">
+      <div id="bs-summary"></div>
+      <div class="block-row" id="bs-block-row" style="margin-top:14px">
+        <input type="checkbox" id="bs-block" />
+        <label for="bs-block" id="bs-block-label">🚫 Bloker også afsenderne — fremtidige tickets auto-arkiveres</label>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin-top:14px">
+        Tickets arkiveres i HubSpot (kan gendannes i 90 dage via Recycle Bin).
+      </p>
+    </div>
+    <footer>
+      <div></div>
+      <div style="display:flex;gap:8px">
+        <button id="bs-cancel" class="ghost">Annullér</button>
+        <button id="bs-confirm" class="danger">Arkivér</button>
+      </div>
+    </footer>
+  </dialog>
+
+  <dialog id="blocklist-dialog">
+    <header>
+      <h1>Blokeret afsendere</h1>
+      <div class="meta">Tickets fra disse adresser/domæner auto-arkiveres ved hver opdatering</div>
+    </header>
+    <div class="body">
+      <div class="bl-section-title">Emails</div>
+      <ul class="bl-list" id="bl-emails"></ul>
+      <div class="bl-section-title">Domæner</div>
+      <ul class="bl-list" id="bl-domains"></ul>
+    </div>
+    <footer>
+      <div></div>
+      <div><button id="bl-close">Luk</button></div>
+    </footer>
+  </dialog>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    const $ = sel => document.querySelector(sel);
+    const fmtDate = iso => {
+      if (!iso) return '';
+      try {
+        return new Date(iso).toLocaleString('da-DK', {
+          dateStyle: 'medium', timeStyle: 'short'
+        });
+      } catch { return iso; }
+    };
+
+    function contactLine(c) {
+      if (!c) return 'Ingen kontakt knyttet';
+      const name = [c.firstname, c.lastname].filter(Boolean).join(' ');
+      const parts = [];
+      if (name) parts.push(name);
+      if (c.email) parts.push(c.email);
+      if (c.company) parts.push(c.company);
+      return parts.join(' · ') || 'Ukendt kontakt';
+    }
+
+    const VERDICT_BADGE = {
+      lead: { cls: 'lead', label: 'Lead' },
+      spam: { cls: 'spam', label: 'Spam' },
+      usikker: { cls: 'warn', label: 'Andre henvendelser' },
+      pressemeddelelse: { cls: 'press', label: 'Pressemeddelelse' },
+      opsigelse: { cls: 'opsig', label: 'Opsigelse' }
+    };
+
+    function reasonItems(t) {
+      const items = [];
+      if (t.llm && t.llm.begrundelse) {
+        items.push({ kind: 'llm', text: 'AI: ' + t.llm.begrundelse });
+      }
+      items.push(
+        ...(t.reasons.opsigelse || []).map(r => ({ kind: 'opsig', text: r })),
+        ...(t.reasons.lead || []).map(r => ({ kind: 'lead', text: r })),
+        ...(t.reasons.press || []).map(r => ({ kind: 'press', text: r })),
+        ...(t.reasons.spam || []).map(r => ({ kind: 'spam', text: r }))
+      );
+      return items;
+    }
+
+    function ticketCard(t) {
+      const v = VERDICT_BADGE[t.verdict] || { cls: 'warn', label: t.verdict };
+      const div = document.createElement('div');
+      div.className = 'ticket';
+      const llmBadge = t.llm && !t.manualOverride ? '<span class="llm-tag" title="Vurderet af AI">AI</span>' : '';
+      const catBadge = t.spamCategory && t.verdict === 'spam' && !t.manualOverride
+        ? `<span class="cat-tag" title="Spam-kategori">${t.spamCategory}</span>`
+        : '';
+      const manualBadge = t.manualOverride
+        ? '<span class="manual-tag" title="Manuelt flyttet — auto-vurdering var ' + (t.autoVerdict || '?') + '">MANUEL</span>'
+        : '';
+      const showSpamPct = t.verdict !== 'pressemeddelelse' && t.verdict !== 'opsigelse';
+      const senderEmail = (t.contact && t.contact.email) || '';
+      const moveOptions = ['lead','spam','pressemeddelelse','usikker','opsigelse']
+        .filter(k => k !== t.verdict)
+        .map(k => `<option value="${k}">${VERDICT_BADGE[k]?.label || k}</option>`)
+        .join('');
+      div.innerHTML = `
+        <div class="row">
+          <div class="subj"></div>
+          <span class="badge ${v.cls}">
+            ${v.label}${showSpamPct ? ' · ' + t.spamProbability + '% spam' : ''}
+            ${catBadge}${llmBadge}${manualBadge}
+          </span>
+          <span class="ticket-actions">
+            <select class="move-select" title="Flyt ticket til en anden kategori">
+              <option value="">↪ Flyt til…</option>
+              ${moveOptions}
+            </select>
+            <button class="archive-btn" title="Arkivér alle tickets fra denne afsender" ${senderEmail ? '' : 'disabled'}>
+              🗑 Afsender
+            </button>
+          </span>
+        </div>
+        <div class="from"></div>
+        <div class="body"></div>
+        <div class="reasons"></div>
+      `;
+      div.querySelector('.subj').textContent = t.subject;
+      div.querySelector('.from').textContent = contactLine(t.contact) + (t.createdate ? ' · ' + fmtDate(t.createdate) : '');
+      div.querySelector('.body').textContent = t.bodySnippet || '(ingen tekst)';
+      const reasons = div.querySelector('.reasons');
+      for (const r of reasonItems(t).slice(0, 5)) {
+        const span = document.createElement('span');
+        span.className = 'reason ' + r.kind;
+        span.textContent = r.text;
+        reasons.appendChild(span);
+      }
+      const archBtn = div.querySelector('.archive-btn');
+      if (senderEmail) {
+        archBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openArchiveDialog(senderEmail);
+        });
+      }
+      const moveSelect = div.querySelector('.move-select');
+      moveSelect.addEventListener('click', (e) => e.stopPropagation());
+      moveSelect.addEventListener('change', async (e) => {
+        e.stopPropagation();
+        const verdict = e.target.value;
+        if (!verdict) return;
+        await moveTicket(t.id, verdict, t);
+      });
+      div.addEventListener('click', () => openDetail(t));
+      return div;
+    }
+
+    async function moveTicket(id, verdict, ticket) {
+      try {
+        const res = await fetch('/api/tickets/' + id + '/verdict', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ verdict })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'fejl');
+        const label = VERDICT_BADGE[verdict]?.label || verdict;
+        showToast(`Flyttet "${(ticket.subject||'').slice(0,40)}" → ${label}`);
+        await load(true);
+      } catch (err) {
+        showToast('Fejl ved flytning: ' + err.message, true);
+      }
+    }
+
+    async function clearManualVerdict(id) {
+      try {
+        const res = await fetch('/api/tickets/' + id + '/verdict', { method: 'DELETE' });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          throw new Error(d.error || 'fejl');
+        }
+        showToast('Manuel flytning fjernet — bruger auto-vurdering igen');
+        $('#detail').close();
+        await load(true);
+      } catch (err) {
+        showToast('Fejl: ' + err.message, true);
+      }
+    }
+
+    function render(payload) {
+      const p = payload.pipeline || {};
+      $('#hdr-sub').textContent = `Vores Digital · ${p.label || ''}${p.stage ? ' · ' + p.stage : ''}`;
+      const llm = payload.llm || {};
+      const llmInfo = llm.model
+        ? ` · AI: ${llm.called || 0} kald + ${llm.cached || 0} cache${llm.errors ? ' (' + llm.errors + ' fejl)' : ''}`
+        : '';
+      $('#meta').textContent = `Hentet ${fmtDate(payload.fetchedAt)} · ${payload.counts.total} tickets${llmInfo}`;
+      $('#cnt-leads').textContent = payload.counts.leads;
+      $('#cnt-spam').textContent = payload.counts.spam;
+      $('#cnt-usikker').textContent = payload.counts.usikker;
+      $('#cnt-press').textContent = payload.counts.pressemeddelelser || 0;
+      $('#cnt-opsig').textContent = payload.counts.opsigelser || 0;
+
+      const stats = $('#stats');
+      stats.innerHTML = '';
+      const cards = [
+        { lbl: 'Tickets i alt', num: payload.counts.total, cls: '', target: null },
+        { lbl: 'Leads', num: payload.counts.leads, cls: 'lead', target: 'list-leads' },
+        { lbl: 'Opsigelser', num: payload.counts.opsigelser || 0, cls: 'opsig', target: 'list-opsig' },
+        { lbl: 'Spam', num: payload.counts.spam, cls: 'spam', target: 'list-spam' },
+        { lbl: 'Andre henvendelser', num: payload.counts.usikker, cls: 'warn', target: 'list-usikker' },
+        { lbl: 'Pressemeddelelser', num: payload.counts.pressemeddelelser || 0, cls: '', target: 'list-press' }
+      ];
+      for (const c of cards) {
+        const el = document.createElement('div');
+        el.className = 'stat ' + c.cls + (c.target ? ' clickable' : '');
+        el.innerHTML = `<div class="num"></div><div class="lbl"></div>`;
+        el.querySelector('.num').textContent = c.num;
+        el.querySelector('.lbl').textContent = c.lbl;
+        if (c.target) {
+          el.addEventListener('click', () => {
+            const section = document.getElementById(c.target);
+            if (!section) return;
+            const col = section.closest('.col');
+            (col || section).scrollIntoView({ behavior: 'smooth', block: 'start' });
+          });
+        }
+        stats.appendChild(el);
+      }
+
+      const groups = {
+        'list-leads': payload.tickets.filter(t => t.verdict === 'lead')
+          .sort((a, b) => b.leadScore - a.leadScore),
+        'list-spam': payload.tickets.filter(t => t.verdict === 'spam')
+          .sort((a, b) => b.spamScore - a.spamScore),
+        'list-opsig': payload.tickets.filter(t => t.verdict === 'opsigelse')
+          .sort((a, b) => new Date(b.createdate || 0) - new Date(a.createdate || 0)),
+        'list-usikker': payload.tickets.filter(t => t.verdict === 'usikker')
+          .sort((a, b) => new Date(b.createdate || 0) - new Date(a.createdate || 0)),
+        'list-press': payload.tickets.filter(t => t.verdict === 'pressemeddelelse')
+          .sort((a, b) => new Date(b.createdate || 0) - new Date(a.createdate || 0))
+      };
+      for (const [id, list] of Object.entries(groups)) {
+        const root = document.getElementById(id);
+        root.innerHTML = '';
+        if (!list.length) {
+          const empty = document.createElement('div');
+          empty.className = 'empty';
+          empty.textContent = 'Ingen tickets i denne kategori.';
+          root.appendChild(empty);
+          continue;
+        }
+        for (const t of list) root.appendChild(ticketCard(t));
+      }
+    }
+
+    let openTicketId = null;
+    function openDetail(t) {
+      openTicketId = t.id;
+      $('#d-subj').textContent = t.subject;
+      const meta = [contactLine(t.contact), t.stage, t.priority, fmtDate(t.createdate)]
+        .filter(Boolean).join(' · ');
+      $('#d-meta').textContent = meta;
+      $('#d-body').textContent = t.bodyFull || '(ingen tekst)';
+      $('#d-link').href = t.hubspotUrl;
+      const clearBtn = $('#d-clear-manual');
+      if (t.manualOverride) {
+        clearBtn.style.display = 'inline-block';
+        clearBtn.textContent = `Fjern manuel flytning (auto: ${t.autoVerdict || '?'})`;
+      } else {
+        clearBtn.style.display = 'none';
+      }
+      const r = $('#d-reasons');
+      r.innerHTML = '';
+      for (const x of reasonItems(t)) {
+        const span = document.createElement('span');
+        span.className = 'reason ' + x.kind;
+        span.textContent = x.text;
+        r.appendChild(span);
+      }
+      $('#detail').showModal();
+    }
+    $('#d-close').addEventListener('click', () => $('#detail').close());
+    $('#d-clear-manual').addEventListener('click', () => {
+      if (openTicketId) clearManualVerdict(openTicketId);
+    });
+
+    function showToast(msg, isError) {
+      const el = $('#toast');
+      el.textContent = msg;
+      el.className = 'toast visible' + (isError ? ' error' : '');
+      clearTimeout(el._t);
+      el._t = setTimeout(() => { el.className = 'toast'; }, 3500);
+    }
+
+    let pendingArchive = null;
+
+    function getScope() {
+      const sel = document.querySelector('input[name="a-scope"]:checked');
+      return sel ? sel.value : 'email';
+    }
+
+    function renderArchivePreview(data) {
+      const target = pendingArchive.scope === 'email' ? pendingArchive.email : '@' + pendingArchive.domain;
+      $('#a-summary').innerHTML = data.count === 0
+        ? '<strong>Ingen tickets fundet for denne afsender.</strong>'
+        : `<strong>${data.count} tickets</strong> fra <em>${target}</em> bliver arkiveret:`;
+
+      const list = $('#a-preview');
+      list.innerHTML = '';
+      data.sample.forEach(s => {
+        const li = document.createElement('li');
+        const verd = s.verdict ? ` [${s.verdict}]` : '';
+        const fromEmail = pendingArchive.scope === 'domain' && s.contactEmail ? ` (${s.contactEmail})` : '';
+        li.textContent = (s.subject || '(uden emne)') + verd + fromEmail;
+        list.appendChild(li);
+      });
+      if (data.count > data.sample.length) {
+        const li = document.createElement('li');
+        li.style.fontStyle = 'italic';
+        li.textContent = `… og ${data.count - data.sample.length} mere`;
+        list.appendChild(li);
+      }
+      $('#a-confirm').disabled = data.count === 0;
+      $('#a-confirm').textContent = data.count === 0 ? 'Intet at arkivere' : `Arkivér ${data.count} tickets`;
+    }
+
+    async function loadScopeCount(scope) {
+      const url = scope === 'email'
+        ? '/api/tickets/by-sender?email=' + encodeURIComponent(pendingArchive.email)
+        : '/api/tickets/by-sender?domain=' + encodeURIComponent(pendingArchive.domain);
+      const res = await fetch(url);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'fejl');
+      return data;
+    }
+
+    async function refreshArchivePreview() {
+      if (!pendingArchive) return;
+      pendingArchive.scope = getScope();
+      try {
+        const data = await loadScopeCount(pendingArchive.scope);
+        renderArchivePreview(data);
+      } catch (err) {
+        $('#a-summary').textContent = 'Fejl: ' + err.message;
+      }
+    }
+
+    async function openArchiveDialog(email) {
+      const dlg = $('#archive-dialog');
+      const domain = (email.split('@')[1] || '').toLowerCase();
+      pendingArchive = { email, domain, scope: 'email' };
+
+      $('#a-meta').textContent = email;
+      $('#a-summary').textContent = 'Henter oversigt…';
+      $('#a-preview').innerHTML = '';
+      $('#a-block').checked = false;
+      $('#a-confirm').disabled = true;
+      $('#a-confirm').textContent = 'Arkivér';
+      $('#a-scope-email-label').textContent = `Kun fra ${email}`;
+      $('#a-scope-domain-label').textContent = `Alle fra @${domain}`;
+      $('#a-scope-email-count').textContent = '…';
+      $('#a-scope-domain-count').textContent = '…';
+      document.querySelector('input[name="a-scope"][value="email"]').checked = true;
+      dlg.showModal();
+
+      // Hent counts for begge scope parallelt
+      try {
+        const [eData, dData] = await Promise.all([
+          loadScopeCount('email'),
+          loadScopeCount('domain')
+        ]);
+        $('#a-scope-email-count').textContent = eData.count + ' tickets';
+        $('#a-scope-domain-count').textContent = dData.count + ' tickets';
+        renderArchivePreview(eData);
+      } catch (err) {
+        $('#a-summary').textContent = 'Fejl: ' + err.message;
+      }
+    }
+
+    document.querySelectorAll('input[name="a-scope"]').forEach(el => {
+      el.addEventListener('change', refreshArchivePreview);
+    });
+
+    $('#a-cancel').addEventListener('click', () => $('#archive-dialog').close());
+
+    $('#a-confirm').addEventListener('click', async () => {
+      if (!pendingArchive) return;
+      const btn = $('#a-confirm');
+      const block = $('#a-block').checked;
+      const scope = pendingArchive.scope;
+      btn.disabled = true;
+      btn.textContent = block ? 'Arkiverer + blokerer…' : 'Arkiverer…';
+      try {
+        const body = scope === 'email'
+          ? { email: pendingArchive.email, block }
+          : { domain: pendingArchive.domain, block };
+        const res = await fetch('/api/tickets/archive-by-sender', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'fejl');
+        $('#archive-dialog').close();
+        const target = data.email || ('@' + data.domain);
+        const blockMsg = data.blocked ? ' og blokeret fremover' : '';
+        showToast(`${data.archived} tickets fra ${target} arkiveret${blockMsg}`);
+        pendingArchive = null;
+        await load(true);
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = 'Prøv igen';
+        showToast('Fejl: ' + err.message, true);
+      }
+    });
+
+    async function refreshBlocklist() {
+      const res = await fetch('/api/blocklist');
+      const data = await res.json();
+      const renderList = (target, items, kind) => {
+        target.innerHTML = '';
+        if (!items.length) {
+          target.innerHTML = '<li class="empty">Ingen</li>';
+          return;
+        }
+        for (const v of items) {
+          const li = document.createElement('li');
+          const label = document.createElement('span');
+          label.textContent = v;
+          const btn = document.createElement('button');
+          btn.className = 'unblock';
+          btn.textContent = 'Fjern';
+          btn.addEventListener('click', async () => {
+            btn.disabled = true;
+            btn.textContent = 'Fjerner…';
+            try {
+              await fetch('/api/blocklist?value=' + encodeURIComponent(v), { method: 'DELETE' });
+              showToast(`${v} fjernet fra bloklisten`);
+              await refreshBlocklist();
+            } catch (err) {
+              btn.disabled = false;
+              btn.textContent = 'Prøv igen';
+              showToast('Fejl: ' + err.message, true);
+            }
+          });
+          li.appendChild(label);
+          li.appendChild(btn);
+          target.appendChild(li);
+        }
+      };
+      renderList($('#bl-emails'), data.emails || [], 'email');
+      renderList($('#bl-domains'), data.domains || [], 'domain');
+    }
+
+    $('#show-blocklist').addEventListener('click', async () => {
+      $('#blocklist-dialog').showModal();
+      await refreshBlocklist();
+    });
+    $('#bl-close').addEventListener('click', () => $('#blocklist-dialog').close());
+
+    let lastPayload = null;
+    async function load(force = false) {
+      $('#err').hidden = true;
+      try {
+        const res = await fetch('/api/tickets' + (force ? '?refresh=1' : ''));
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          throw new Error(j.error || ('HTTP ' + res.status));
+        }
+        const payload = await res.json();
+        lastPayload = payload;
+        render(payload);
+      } catch (err) {
+        $('#err').hidden = false;
+        $('#err').textContent = 'Fejl: ' + err.message;
+      }
+    }
+
+    $('#forward-leads-btn').addEventListener('click', async () => {
+      const dlg = $('#forward-leads-dialog');
+      $('#fl-meta').textContent = 'Henter oversigt…';
+      $('#fl-summary').textContent = '';
+      $('#fl-preview').innerHTML = '';
+      $('#fl-warning').style.display = 'none';
+      $('#fl-confirm').disabled = true;
+      $('#fl-confirm').textContent = 'Send';
+      dlg.showModal();
+
+      try {
+        const res = await fetch('/api/leads/forward/preview');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'fejl');
+
+        $('#fl-meta').textContent = `Til: ${data.to || '(mangler)'}`;
+        $('#fl-summary').innerHTML = data.count === 0
+          ? '<strong>Ingen leads at sende.</strong>'
+          : `<strong>${data.count} leads</strong> sendes som <strong>${data.count} individuelle mails</strong>:`;
+
+        const list = $('#fl-preview');
+        list.innerHTML = '';
+        data.sample.forEach(s => {
+          const li = document.createElement('li');
+          const from = s.contactEmail ? ` (${s.contactEmail})` : '';
+          li.textContent = (s.subject || '(uden emne)') + from;
+          list.appendChild(li);
+        });
+        if (data.count > data.sample.length) {
+          const li = document.createElement('li');
+          li.style.fontStyle = 'italic';
+          li.textContent = `… og ${data.count - data.sample.length} mere`;
+          list.appendChild(li);
+        }
+
+        const issues = [];
+        if (!data.apiKeyConfigured) issues.push('VORESDIGITAL_API_KEY mangler i .env');
+        if (issues.length) {
+          $('#fl-warning').textContent = '⚠ ' + issues.join(' · ');
+          $('#fl-warning').style.display = 'block';
+        }
+
+        $('#fl-confirm').disabled = data.count === 0 || issues.length > 0;
+        $('#fl-confirm').textContent = data.count === 0 ? 'Intet at sende' : `Send ${data.count} mails`;
+      } catch (err) {
+        $('#fl-summary').textContent = 'Fejl: ' + err.message;
+      }
+    });
+
+    $('#fl-cancel').addEventListener('click', () => $('#forward-leads-dialog').close());
+
+    $('#fl-confirm').addEventListener('click', async () => {
+      const btn = $('#fl-confirm');
+      const orig = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Sender…';
+      try {
+        const res = await fetch('/api/leads/forward', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'fejl');
+        $('#forward-leads-dialog').close();
+        const failMsg = data.failed ? ` · ${data.failed} fejlede` : '';
+        const archMsg = data.archiveError
+          ? ` · flytning fejlede: ${data.archiveError}`
+          : ` · ${data.archived} flyttet til Closed`;
+        showToast(`${data.sent} mails sendt til ${data.to}${failMsg}${archMsg}`, !!data.archiveError || !!data.failed);
+        await load(true);
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = orig;
+        showToast('Fejl: ' + err.message, true);
+      }
+    });
+
+    const VERDICT_TITLES = {
+      lead: { title: 'Arkivér alle leads', noun: 'leads' },
+      spam: { title: 'Tøm spam-bunken', noun: 'spam-tickets' },
+      opsigelse: { title: 'Arkivér alle opsigelser', noun: 'opsigelser' },
+      usikker: { title: 'Arkivér alle andre henvendelser', noun: 'andre henvendelser' },
+      pressemeddelelse: { title: 'Arkivér alle pressemeddelelser', noun: 'pressemeddelelser' }
+    };
+
+    let pendingBulkVerdict = null;
+
+    function openBulkArchiveDialog(verdict, blockDefault) {
+      if (!lastPayload) return;
+      const tickets = lastPayload.tickets.filter(t => t.verdict === verdict);
+      if (!tickets.length) {
+        showToast(`Ingen ${VERDICT_TITLES[verdict]?.noun || 'tickets'} at arkivere`);
+        return;
+      }
+      const uniqueEmails = [...new Set(
+        tickets
+          .map(t => ((t.contact && t.contact.email) || '').toLowerCase().trim())
+          .filter(e => e && e.includes('@'))
+      )];
+      pendingBulkVerdict = verdict;
+
+      const meta = VERDICT_TITLES[verdict] || { title: 'Arkivér alle', noun: 'tickets' };
+      $('#bs-title').textContent = meta.title;
+      $('#bs-subtitle').textContent = `${tickets.length} ${meta.noun} arkiveres i HubSpot`;
+      $('#bs-block').checked = !!blockDefault;
+      $('#bs-block-label').textContent = `🚫 Bloker også de ${uniqueEmails.length} unikke afsendere — fremtidige tickets auto-arkiveres`;
+      $('#bs-summary').innerHTML = `
+        <strong>${tickets.length} ${meta.noun}</strong> bliver arkiveret.<br>
+        <span style="color:var(--muted);font-size:12px">${uniqueEmails.length} unikke afsendere kan blokeres samtidig (vælg checkboxen nedenfor).</span>
+      `;
+      $('#bs-confirm').disabled = false;
+      $('#bs-confirm').textContent = `Arkivér ${tickets.length}`;
+      $('#bs-block').onchange = () => {
+        const block = $('#bs-block').checked;
+        $('#bs-confirm').textContent = block
+          ? `Arkivér ${tickets.length} + bloker ${uniqueEmails.length}`
+          : `Arkivér ${tickets.length}`;
+      };
+      $('#bs-block').onchange();
+      $('#bulk-archive-dialog').showModal();
+    }
+
+    $('#opsig-move-btn').addEventListener('click', () => {
+      if (!lastPayload) return;
+      const opsig = lastPayload.tickets.filter(t => t.verdict === 'opsigelse');
+      if (!opsig.length) {
+        showToast('Ingen opsigelser at flytte');
+        return;
+      }
+      $('#om-summary').innerHTML = `<strong>${opsig.length} opsigelser</strong> flyttes til Intern Support / New:`;
+      const list = $('#om-preview');
+      list.innerHTML = '';
+      opsig.slice(0, 5).forEach(t => {
+        const li = document.createElement('li');
+        const c = (t.contact && t.contact.email) ? ` (${t.contact.email})` : '';
+        li.textContent = (t.subject || '(uden emne)') + c;
+        list.appendChild(li);
+      });
+      if (opsig.length > 5) {
+        const li = document.createElement('li');
+        li.style.fontStyle = 'italic';
+        li.textContent = `… og ${opsig.length - 5} mere`;
+        list.appendChild(li);
+      }
+      $('#om-confirm').disabled = false;
+      $('#om-confirm').textContent = `Flyt ${opsig.length} opsigelser`;
+      $('#opsig-dialog').showModal();
+    });
+
+    $('#om-cancel').addEventListener('click', () => $('#opsig-dialog').close());
+
+    $('#om-confirm').addEventListener('click', async () => {
+      const btn = $('#om-confirm');
+      const orig = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Flytter…';
+      try {
+        const res = await fetch('/api/opsigelser/move-to-internal', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'fejl');
+        $('#opsig-dialog').close();
+        showToast(`${data.moved} opsigelser flyttet til Intern Support / New`);
+        await load(true);
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = orig;
+        showToast('Fejl: ' + err.message, true);
+      }
+    });
+
+    $('#press-handle-btn').addEventListener('click', async () => {
+      const dlg = $('#press-dialog');
+      $('#ph-meta').textContent = 'Henter oversigt…';
+      $('#ph-summary').textContent = '';
+      $('#ph-preview').innerHTML = '';
+      $('#ph-warning').style.display = 'none';
+      $('#ph-confirm').disabled = true;
+      dlg.showModal();
+
+      try {
+        const res = await fetch('/api/press/preview');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'fejl');
+
+        $('#ph-meta').textContent = data.template
+          ? `Template: "${data.template.subject}" (${data.template.bodyLength} tegn HTML)`
+          : 'Template kunne ikke læses';
+        $('#ph-summary').innerHTML = data.uniqueSenders === 0
+          ? '<strong>Ingen pressemeddelelser med afsender-email at sende til.</strong>'
+          : `<strong>${data.pressTotal} pressemeddelelser</strong> fra <strong>${data.uniqueSenders} unikke afsendere</strong> håndteres:`;
+
+        const list = $('#ph-preview');
+        list.innerHTML = '';
+        (data.sampleSenders || []).forEach(s => {
+          const li = document.createElement('li');
+          li.textContent = `${s.email} (${s.ticketCount} stk) — fx "${(s.sampleSubject||'').slice(0,50)}"`;
+          list.appendChild(li);
+        });
+        if (data.uniqueSenders > (data.sampleSenders || []).length) {
+          const li = document.createElement('li');
+          li.style.fontStyle = 'italic';
+          li.textContent = `… og ${data.uniqueSenders - data.sampleSenders.length} mere`;
+          list.appendChild(li);
+        }
+
+        const issues = [];
+        if (!data.apiKeyConfigured) issues.push('VORESDIGITAL_API_KEY mangler i .env');
+        if (data.templateError) issues.push('pm-template.json: ' + data.templateError);
+        if (!data.template && !data.templateError) issues.push('pm-template.json mangler subject/body');
+        if (data.ticketsWithoutContact > 0) issues.push(`${data.ticketsWithoutContact} tickets uden afsender-email springes over`);
+        if (issues.length) {
+          $('#ph-warning').textContent = '⚠ ' + issues.join(' · ');
+          $('#ph-warning').style.display = 'block';
+        }
+
+        const cantSend = !data.apiKeyConfigured || data.templateError || !data.template;
+        $('#ph-confirm').disabled = data.uniqueSenders === 0 || cantSend;
+        $('#ph-confirm').textContent = data.uniqueSenders === 0
+          ? 'Intet at sende'
+          : `Send ${data.uniqueSenders} mails + arkivér ${data.pressTotal} + bloker ${data.uniqueSenders}`;
+      } catch (err) {
+        $('#ph-summary').textContent = 'Fejl: ' + err.message;
+      }
+    });
+
+    $('#ph-cancel').addEventListener('click', () => $('#press-dialog').close());
+
+    $('#ph-confirm').addEventListener('click', async () => {
+      const btn = $('#ph-confirm');
+      const orig = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Sender + arkiverer + blokerer…';
+      try {
+        const res = await fetch('/api/press/handle', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'fejl');
+        $('#press-dialog').close();
+        const failMsg = data.failed ? ` · ${data.failed} fejlede` : '';
+        const archMsg = data.archiveError
+          ? ` · arkivering fejlede: ${data.archiveError}`
+          : ` · ${data.archived} arkiveret`;
+        showToast(`${data.sent} mails sendt${failMsg}${archMsg} · ${data.blocked} blokeret`, !!data.archiveError || !!data.failed);
+        await load(true);
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = orig;
+        showToast('Fejl: ' + err.message, true);
+      }
+    });
+
+    document.querySelectorAll('button[data-bulk]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const verdict = btn.getAttribute('data-bulk');
+        const blockDefault = btn.getAttribute('data-block-default') === 'true';
+        openBulkArchiveDialog(verdict, blockDefault);
+      });
+    });
+
+    $('#bs-cancel').addEventListener('click', () => $('#bulk-archive-dialog').close());
+
+    $('#bs-confirm').addEventListener('click', async () => {
+      if (!pendingBulkVerdict) return;
+      const verdict = pendingBulkVerdict;
+      const block = $('#bs-block').checked;
+      const btn = $('#bs-confirm');
+      const originalText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = block ? 'Arkiverer + blokerer…' : 'Arkiverer…';
+      try {
+        const res = await fetch('/api/tickets/archive-bucket', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ verdict, block })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'fejl');
+        $('#bulk-archive-dialog').close();
+        const blockMsg = block && data.blocked ? ` · ${data.blocked} afsendere blokeret` : '';
+        showToast(`${data.archived} tickets arkiveret${blockMsg}`);
+        pendingBulkVerdict = null;
+        await load(true);
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = originalText;
+        showToast('Fejl: ' + err.message, true);
+      }
+    });
+
+    $('#refresh').addEventListener('click', () => load(true));
+    load();
+  </script>
+</body>
+</html>
