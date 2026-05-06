@@ -556,6 +556,76 @@ function extractImages($, baseUrl, css, jsonLdImages) {
     .map(([url]) => url);
 }
 
+// Scrape contact info — phone numbers, address, and social profile URLs.
+// These appear in nearly every brand banner and are easy to extract reliably:
+// tel: links and schema.org PostalAddress give us structured data straight
+// from the page without needing Claude to infer.
+function extractContactInfo($, baseUrl) {
+  const out = { phone: '', address: '', facebookUrl: '', instagramUrl: '' };
+
+  // Phone — prefer tel: hrefs (always machine-readable), fall back to first
+  // <a href="tel:..."> text, then look for a phone in the footer.
+  const tel = $('a[href^="tel:"]').first();
+  if (tel.length) {
+    const num = (tel.attr('href') || '').replace(/^tel:/, '').trim();
+    if (num) out.phone = num;
+  }
+
+  // Address — schema.org/PostalAddress is the cleanest source. JSON-LD or
+  // microdata both work; here we look at microdata + visible <address> tags.
+  const $addr = $('address, [itemtype*="PostalAddress"], .address, footer .contact').first();
+  if ($addr.length) {
+    const raw = $addr.text().replace(/\s+/g, ' ').trim();
+    // Trim to roughly two lines worth — avoid sucking in the whole footer
+    if (raw.length > 0 && raw.length < 200) out.address = raw;
+  }
+
+  // JSON-LD — second pass for structured PostalAddress
+  if (!out.address) {
+    $('script[type="application/ld+json"]').each((_, el) => {
+      let parsed;
+      try { parsed = JSON.parse($(el).text() || $(el).html() || ''); } catch { return; }
+      const visit = (node) => {
+        if (!node || typeof node !== 'object') return;
+        if (Array.isArray(node)) { node.forEach(visit); return; }
+        if (node['@type'] && /PostalAddress/i.test(String(node['@type']))) {
+          const parts = [
+            node.streetAddress,
+            [node.postalCode, node.addressLocality].filter(Boolean).join(' '),
+          ].filter(Boolean);
+          if (parts.length && !out.address) out.address = parts.join('\n');
+        }
+        if (node.address && typeof node.address === 'object') visit(node.address);
+        if (node.telephone && !out.phone) out.phone = String(node.telephone);
+        if (node['@graph']) visit(node['@graph']);
+      };
+      visit(parsed);
+    });
+  }
+
+  // Social — match Facebook and Instagram URLs in any <a href>. Filter to
+  // profile/page URLs (not generic share links).
+  const socialHosts = {
+    facebookUrl: /(?:^|\.)facebook\.com\b/i,
+    instagramUrl: /(?:^|\.)instagram\.com\b/i,
+  };
+  $('a[href]').each((_, el) => {
+    const href = ($(el).attr('href') || '').trim();
+    if (!href || href.startsWith('#') || /\bshare(?:r)?\.php|sharer\b/i.test(href)) return;
+    const resolved = resolveUrl(baseUrl, href);
+    if (!resolved) return;
+    for (const [key, host] of Object.entries(socialHosts)) {
+      if (out[key]) continue;
+      try {
+        const u = new URL(resolved);
+        if (host.test(u.hostname) && u.pathname.length > 1) out[key] = resolved;
+      } catch { /* ignore */ }
+    }
+  });
+
+  return out;
+}
+
 async function extractPageData(html, baseUrl) {
   const $ = cheerio.load(html);
 
@@ -575,6 +645,10 @@ async function extractPageData(html, baseUrl) {
 
   // Logos come from the FULL DOM (header/nav is where they live).
   const logos = extractLogos($, baseUrl, jsonLd.logos);
+
+  // Contact info also comes from the FULL DOM — addresses and social links
+  // typically live in the header or footer that we strip below.
+  const contact = extractContactInfo($, baseUrl);
 
   // Now strip chrome so textContent/images come from body/main content only.
   $('script, style, nav, footer, header, [role="navigation"]').remove();
@@ -612,6 +686,7 @@ async function extractPageData(html, baseUrl) {
     logos,
     title: ogTitle || title,
     design,
+    contact,
   };
 }
 
@@ -634,6 +709,7 @@ app.post('/api/analyze', async (req, res) => {
     let images = [];
     let logos = [];
     let title = '';
+    let contact = { phone: '', address: '', facebookUrl: '', instagramUrl: '' };
     let design = {
       themeColor: '', googleFonts: [], cssVars: {}, dominantColors: [],
       bodyFont: '', headlineFont: '',
@@ -652,6 +728,7 @@ app.post('/api/analyze', async (req, res) => {
         logos       = page.logos || [];
         title       = page.title;
         design      = page.design;
+        contact     = page.contact || contact;
       } catch (err) {
         return res.status(400).json({ error: `Could not fetch website: ${err.message}` });
       }
@@ -803,6 +880,14 @@ Return ONLY a valid JSON object — no markdown, no explanation:
         headlineFont: design.headlineFont || '',
       };
     }
+
+    // Merge scraped contact info into analysis. Claude doesn't see contact
+    // info in the prompt — addresses and phone numbers are factual data we
+    // pull straight from the page, no LLM judgment needed.
+    analysis.address      = contact.address      || analysis.address      || '';
+    analysis.phone        = contact.phone        || analysis.phone        || '';
+    analysis.facebookUrl  = contact.facebookUrl  || analysis.facebookUrl  || '';
+    analysis.instagramUrl = contact.instagramUrl || analysis.instagramUrl || '';
 
     // designTokens are concrete CSS values lifted from the page — the frontend
     // applies them directly to the banner (border-radius, font-weight, button

@@ -15,6 +15,11 @@ const DEFAULT_POSITIONS = {
   subtext:     { x: 300, y: 198 },
   cta:         { x: 300, y: 258 },
   tagline:     { x: 300, y: 296 },
+  // Contact-strip elements — bottom row by default. Sit alongside CTA in
+  // free-floating layouts, get repositioned by zoned layouts that include them.
+  address:     { x: 100, y: 290 },  // bottom-left
+  phone:       { x: 360, y: 290 },  // bottom-centre
+  social:      { x: 540, y: 290 },  // bottom-right
 };
 
 function clonePositions(src) {
@@ -47,6 +52,15 @@ const state = {
   logoSize: 56, // height in source pixels; width auto via aspect ratio
   // Scraped logo candidates from last analyze pass (shown in the logo picker)
   scrapedLogos: [],
+  // Contact info — free-floating elements like the logo. Multi-line address,
+  // phone number, and Facebook/Instagram links rendered as small icons.
+  address: '',
+  phone: '',
+  facebookUrl: '',
+  instagramUrl: '',
+  showAddress: false,
+  showPhone: false,
+  showSocial: false,
   // Background
   selectedImageBase64: null,
   imageAvgColor: null,
@@ -273,6 +287,56 @@ const DESIGN_STYLES = [
     ],
     anchors: { stackX: 0.5, cta: 'flow' }, vAlign: 'center', gap: 0.05, vPad: 0.08,
   },
+
+  /* Contact Strip Bottom — image hero with brand contact info as a dark
+   * footer strip. Mirrors banners #2 (Mæglerhuset), #6 (Bike-Pit) and
+   * #8 (Livingshop) where the bottom 20-25% is reserved for address/phone/
+   * social anchored to a contrasting strip. */
+  {
+    name: 'Contact Strip Bottom',
+    minAspect: 1.6, maxAspect: 6,
+    textAlign: 'center', headlineWeight: '800', overlayOpacity: 0.32,
+    cta: { radius: 4, padV: 11, padH: 28, weight: '700' },
+    typeScale: { headline: 0.090, subtext: 0.052, company: 0.16, tagline: 0.036, cta: 0.060 },
+    zones: [
+      { bounds: { x: 0, y: 0, w: 1, h: 0.76 }, bg: 'image',
+        elements: ['companyName', 'headline', 'subtext', 'cta'],
+        textAlign: 'center', stackX: 0.5, vAlign: 'center', gap: 0.030, vPad: 0.08 },
+      { bounds: { x: 0, y: 0.76, w: 1, h: 0.24 }, bg: 'dark', textColor: 'light',
+        elements: ['address', 'phone', 'social'],
+        textAlign: 'left', stackX: 0.5, vAlign: 'center', gap: 0.02, vPad: 0.05,
+        offStackPositions: {
+          address: { x: 0.18, y: 0.50 },
+          phone:   { x: 0.58, y: 0.50 },
+          social:  { x: 0.90, y: 0.50 },
+        },
+      },
+    ],
+    anchors: { stackX: 0.5, cta: 'flow' }, vAlign: 'center', gap: 0.05, vPad: 0.08,
+  },
+
+  /* Logo Cartouche Left — brand-coloured panel on the left holds just the
+   * logo, image fills the right with the message stack. Mirrors banner #2
+   * (Mæglerhuset). The logo is now zone-eligible so it sits inside the
+   * coloured cartouche instead of free-floating. */
+  {
+    name: 'Logo Cartouche Left',
+    minAspect: 1.6, maxAspect: 5,
+    textAlign: 'left', headlineWeight: '700', overlayOpacity: 0.22,
+    cta: { radius: 4, padV: 10, padH: 26, weight: '700' },
+    typeScale: { headline: 0.090, subtext: 0.050, company: 0.14, tagline: 0.032, cta: 0.054 },
+    zones: [
+      { bounds: { x: 0, y: 0, w: 0.30, h: 1 }, bg: 'brand', textColor: 'light',
+        elements: ['logo', 'tagline'],
+        textAlign: 'center', stackX: 0.5, vAlign: 'center', gap: 0.02, vPad: 0.10,
+        offStackPositions: { logo: { x: 0.5, y: 0.42 } },
+      },
+      { bounds: { x: 0.30, y: 0, w: 0.70, h: 1 }, bg: 'image',
+        elements: ['companyName', 'headline', 'subtext', 'cta'],
+        textAlign: 'left', stackX: 0.08, vAlign: 'center', gap: 0.030, vPad: 0.10 },
+    ],
+    anchors: { stackX: 0.5, cta: 'flow' }, vAlign: 'center', gap: 0.05, vPad: 0.08,
+  },
 ];
 
 const SLIDER_BOUNDS = {
@@ -289,11 +353,25 @@ const ELEMENT_IDS = {
   subtext:     'previewSubtext',
   cta:         'previewCta',
   tagline:     'previewTagline',
+  address:     'previewAddress',
+  phone:       'previewPhone',
+  social:      'previewSocial',
 };
 
+
 function isElementVisible(key) {
-  // Logo is free-floating — not filtered by zones, not part of the text stack.
-  if (key === 'logo') return !!state.showLogo && !!(state.logoBase64 || state.logoUrl);
+  // Logo bypasses zone filtering when it's not assigned to any zone — keeps
+  // backwards compatibility with existing zoned layouts that don't list it.
+  if (key === 'logo') {
+    const hasLogo = !!state.showLogo && !!(state.logoBase64 || state.logoUrl);
+    if (!hasLogo) return false;
+    if (state.zones && state.zones.length) {
+      const assigned = state.zones.some((z) => z.elements.includes('logo'));
+      // If no zone claims the logo, fall back to free-floating (visible).
+      if (!assigned) return true;
+    }
+    return true;
+  }
   // In zoned layouts, only elements assigned to a zone are shown.
   if (state.zones && state.zones.length) {
     const assigned = state.zones.some((z) => z.elements.includes(key));
@@ -304,6 +382,9 @@ function isElementVisible(key) {
   if (key === 'subtext')     return !!state.showSubtext     && !!state.subtext;
   if (key === 'cta')         return !!state.showCta;
   if (key === 'tagline')     return !!state.showTagline     && !!state.tagline;
+  if (key === 'address')     return !!state.showAddress     && !!state.address;
+  if (key === 'phone')       return !!state.showPhone       && !!state.phone;
+  if (key === 'social')      return !!state.showSocial      && !!(state.facebookUrl || state.instagramUrl);
   return false;
 }
 
@@ -406,6 +487,25 @@ async function shuffleLayout() {
         state.elementTextAligns[k] = z.textAlign;
       });
     });
+    // Auto-enable optional elements when a zoned variant claims them and
+    // we have content for them. Otherwise the cartouche/strip would render
+    // empty and the layout would look broken.
+    const autoEnable = {
+      address: () => !!state.address,
+      phone:   () => !!state.phone,
+      social:  () => !!(state.facebookUrl || state.instagramUrl),
+      logo:    () => !!(state.logoBase64 || state.logoUrl),
+    };
+    zones.forEach((z) => {
+      z.elements.forEach((k) => {
+        if (autoEnable[k] && autoEnable[k]()) {
+          if (k === 'address') state.showAddress = true;
+          if (k === 'phone')   state.showPhone   = true;
+          if (k === 'social')  state.showSocial  = true;
+          if (k === 'logo')    state.showLogo    = true;
+        }
+      });
+    });
   } else {
     state.zones = [];
     state.elementColors = {};
@@ -430,6 +530,21 @@ async function shuffleLayout() {
         gap:    zCfg.gap,
         vPad:   zCfg.vPad,
       });
+
+      // Off-stack elements (logo, address, phone, social) placed via
+      // zone-relative fractional anchors. STACK_ORDER elements were already
+      // positioned by flowZone above; this pass handles the rest.
+      if (zCfg.offStackPositions) {
+        const positions = { ...state.positions };
+        for (const [key, anchor] of Object.entries(zCfg.offStackPositions)) {
+          if (!isElementVisible(key)) continue;
+          positions[key] = {
+            x: z.bounds_px.x + Math.round(z.bounds_px.w * anchor.x),
+            y: z.bounds_px.y + Math.round(z.bounds_px.h * anchor.y),
+          };
+        }
+        state.positions = positions;
+      }
     });
   } else {
     flowStack(style, w, h);
@@ -464,6 +579,9 @@ function snapshotVariant() {
     elementTextAligns: { ...(state.elementTextAligns || {}) },
     logoSize:          state.logoSize,
     showLogo:          state.showLogo,
+    showAddress:       state.showAddress,
+    showPhone:         state.showPhone,
+    showSocial:        state.showSocial,
   };
   for (const k of VARIANT_KEYS) snap[k] = state[k];
   return snap;
@@ -477,6 +595,9 @@ function applyVariant(snap) {
   state.elementTextAligns = { ...(snap.elementTextAligns || {}) };
   if (typeof snap.logoSize === 'number') state.logoSize = snap.logoSize;
   if (typeof snap.showLogo === 'boolean') state.showLogo = snap.showLogo;
+  if (typeof snap.showAddress === 'boolean') state.showAddress = snap.showAddress;
+  if (typeof snap.showPhone   === 'boolean') state.showPhone   = snap.showPhone;
+  if (typeof snap.showSocial  === 'boolean') state.showSocial  = snap.showSocial;
   populateEditors();
   renderPreview();
 }
@@ -998,6 +1119,41 @@ function renderPreview() {
   tagline.style.boxShadow = '';
   tagline.style.textShadow = textGlyphShadow(taglineColor);
   tagline.style.display = isElementVisible('tagline') ? '' : 'none';
+
+  // Address (multi-line, free-floating)
+  const address = $('previewAddress');
+  address.textContent = state.address;
+  const addressColor = effectiveTextColor('address', state.primaryColor);
+  address.style.color = addressColor;
+  address.style.left = (pos.address?.x ?? DEFAULT_POSITIONS.address.x) + 'px';
+  address.style.top  = (pos.address?.y ?? DEFAULT_POSITIONS.address.y) + 'px';
+  address.style.textAlign = effectiveTextAlign('address');
+  address.style.textShadow = textGlyphShadow(addressColor);
+  address.style.display = isElementVisible('address') ? '' : 'none';
+
+  // Phone (icon + number)
+  const phone = $('previewPhone');
+  phone.querySelector('.banner-phone-num').textContent = state.phone;
+  const phoneColor = effectiveTextColor('phone', state.primaryColor);
+  phone.style.color = phoneColor;
+  phone.style.left = (pos.phone?.x ?? DEFAULT_POSITIONS.phone.x) + 'px';
+  phone.style.top  = (pos.phone?.y ?? DEFAULT_POSITIONS.phone.y) + 'px';
+  phone.style.textShadow = textGlyphShadow(phoneColor);
+  phone.style.display = isElementVisible('phone') ? '' : 'none';
+
+  // Social icons (Facebook + Instagram)
+  const social = $('previewSocial');
+  const fb = $('previewFacebook');
+  const ig = $('previewInstagram');
+  fb.href = state.facebookUrl || '#';
+  ig.href = state.instagramUrl || '#';
+  fb.style.display = state.facebookUrl  ? '' : 'none';
+  ig.style.display = state.instagramUrl ? '' : 'none';
+  const socialColor = effectiveTextColor('social', state.primaryColor);
+  social.style.color = socialColor;
+  social.style.left = (pos.social?.x ?? DEFAULT_POSITIONS.social.x) + 'px';
+  social.style.top  = (pos.social?.y ?? DEFAULT_POSITIONS.social.y) + 'px';
+  social.style.display = isElementVisible('social') ? '' : 'none';
 }
 
 /* ── Drag to reposition ──────────────────────────────────────────────────── */
@@ -1096,6 +1252,15 @@ function syncFromEditors() {
   state.logoSize        = parseInt($('editLogoSize').value, 10);
   $('logoSizeValue').textContent = state.logoSize + 'px';
 
+  // Contact info
+  state.address      = $('editAddress').value;
+  state.phone        = $('editPhone').value;
+  state.facebookUrl  = $('editFacebookUrl').value.trim();
+  state.instagramUrl = $('editInstagramUrl').value.trim();
+  state.showAddress  = $('editShowAddress').checked;
+  state.showPhone    = $('editShowPhone').checked;
+  state.showSocial   = $('editShowSocial').checked;
+
   state.primaryColor  = $('editPrimaryColor').value;
   state.secondaryColor = $('editSecondaryColor').value;
   state.ctaColor      = $('editCtaColor').value;
@@ -1157,6 +1322,15 @@ function populateEditors() {
   $('editLogoSize').value          = state.logoSize;
   $('logoSizeValue').textContent   = state.logoSize + 'px';
   syncLogoPreview();
+
+  // Contact info
+  $('editAddress').value          = state.address || '';
+  $('editPhone').value            = state.phone || '';
+  $('editFacebookUrl').value      = state.facebookUrl || '';
+  $('editInstagramUrl').value     = state.instagramUrl || '';
+  $('editShowAddress').checked    = !!state.showAddress;
+  $('editShowPhone').checked      = !!state.showPhone;
+  $('editShowSocial').checked     = !!state.showSocial;
 
   $('editPrimaryColor').value   = state.primaryColor;
   $('editSecondaryColor').value = state.secondaryColor;
@@ -1279,6 +1453,13 @@ async function handleAnalyze(e) {
       zones:          [],
       elementColors:  {},
       elementTextAligns: {},
+      address:        analysis.address      || '',
+      phone:          analysis.phone        || '',
+      facebookUrl:    analysis.facebookUrl  || '',
+      instagramUrl:   analysis.instagramUrl || '',
+      showAddress:    !!(analysis.address),
+      showPhone:      !!(analysis.phone),
+      showSocial:     !!(analysis.facebookUrl || analysis.instagramUrl),
     });
 
     // Server already prepends the manually entered image URL; just ensure
@@ -1607,6 +1788,13 @@ async function handleSave() {
     elementColors: state.elementColors,
     elementTextAligns: state.elementTextAligns,
     brandTokens: state.brandTokens || null,
+    address: state.address,
+    phone: state.phone,
+    facebookUrl: state.facebookUrl,
+    instagramUrl: state.instagramUrl,
+    showAddress: state.showAddress,
+    showPhone: state.showPhone,
+    showSocial: state.showSocial,
   };
 
   try {
@@ -1803,6 +1991,13 @@ function loadBanner(b) {
     elementColors:       b.elementColors     ? { ...b.elementColors }     : {},
     elementTextAligns:   b.elementTextAligns ? { ...b.elementTextAligns } : {},
     brandTokens:         b.brandTokens || null,
+    address:             b.address      || '',
+    phone:               b.phone        || '',
+    facebookUrl:         b.facebookUrl  || '',
+    instagramUrl:        b.instagramUrl || '',
+    showAddress:         !!b.showAddress,
+    showPhone:           !!b.showPhone,
+    showSocial:          !!b.showSocial,
   });
 
   // If saved banner had images, populate grid too
@@ -1896,6 +2091,13 @@ function resetBanner() {
     elementColors: {},
     elementTextAligns: {},
     brandTokens: null,
+    address: '',
+    phone: '',
+    facebookUrl: '',
+    instagramUrl: '',
+    showAddress: false,
+    showPhone: false,
+    showSocial: false,
   });
   populateEditors();
   renderPreview();
@@ -2404,10 +2606,13 @@ function init() {
     'editLogoSize',
     'editCtaFontSize', 'editCtaBorderRadius', 'editCtaPaddingV', 'editCtaPaddingH',
     'editCtaFontWeight',
+    'editAddress', 'editPhone', 'editFacebookUrl', 'editInstagramUrl',
+    'editShowAddress', 'editShowPhone', 'editShowSocial',
   ];
   liveEditors.forEach((id) => $(id).addEventListener('input', syncFromEditors));
   // Checkboxes need 'change' too (some browsers fire only 'change' for them)
-  ['editShowCompanyName','editShowHeadline','editShowSubtext','editShowTagline','editShowCta','editShowOverlay','editShowLogo']
+  ['editShowCompanyName','editShowHeadline','editShowSubtext','editShowTagline','editShowCta','editShowOverlay','editShowLogo',
+   'editShowAddress','editShowPhone','editShowSocial']
     .forEach((id) => $(id).addEventListener('change', syncFromEditors));
 
   // Logo URL input + clear button

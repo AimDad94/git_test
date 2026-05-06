@@ -117,6 +117,25 @@
             <div id="previewSubtext"     class="banner-el banner-subtext"  data-element="subtext">Supporting text will appear here after analysis</div>
             <div id="previewTagline"     class="banner-el banner-tagline"  data-element="tagline"></div>
             <div id="previewCta"         class="banner-el banner-cta"      data-element="cta">Learn More</div>
+            <div id="previewAddress"     class="banner-el banner-address"  data-element="address" style="display:none"></div>
+            <div id="previewPhone"       class="banner-el banner-phone"    data-element="phone" style="display:none">
+              <svg class="banner-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path fill="currentColor" d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.3 1.1.4 2.4.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.4 0 .8-.3 1l-2.2 2.2z"/>
+              </svg>
+              <span class="banner-phone-num"></span>
+            </div>
+            <div id="previewSocial"      class="banner-el banner-social"   data-element="social" style="display:none">
+              <a id="previewFacebook" class="banner-social-link" target="_blank" rel="noopener" style="display:none">
+                <svg class="banner-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path fill="currentColor" d="M22 12a10 10 0 1 0-11.6 9.9v-7H7.9V12h2.5V9.8c0-2.5 1.5-3.9 3.7-3.9 1.1 0 2.2.2 2.2.2V8.6h-1.3c-1.2 0-1.6.8-1.6 1.6V12h2.7l-.4 2.9h-2.3v7A10 10 0 0 0 22 12z"/>
+                </svg>
+              </a>
+              <a id="previewInstagram" class="banner-social-link" target="_blank" rel="noopener" style="display:none">
+                <svg class="banner-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path fill="currentColor" d="M12 2.2c3.2 0 3.6 0 4.9.1 1.2.1 1.8.2 2.2.4.6.2 1 .5 1.4.9.4.4.7.9.9 1.4.2.4.4 1 .4 2.2.1 1.3.1 1.7.1 4.9s0 3.6-.1 4.9c-.1 1.2-.2 1.8-.4 2.2-.2.6-.5 1-.9 1.4-.4.4-.9.7-1.4.9-.4.2-1 .4-2.2.4-1.3.1-1.7.1-4.9.1s-3.6 0-4.9-.1c-1.2-.1-1.8-.2-2.2-.4-.6-.2-1-.5-1.4-.9-.4-.4-.7-.9-.9-1.4-.2-.4-.4-1-.4-2.2C2.2 15.6 2.2 15.2 2.2 12s0-3.6.1-4.9c.1-1.2.2-1.8.4-2.2.2-.6.5-1 .9-1.4.4-.4.9-.7 1.4-.9.4-.2 1-.4 2.2-.4C8.4 2.2 8.8 2.2 12 2.2zm0 1.8c-3.1 0-3.5 0-4.7.1-1.1.1-1.7.2-2.1.4-.5.2-.9.4-1.3.8-.4.4-.6.8-.8 1.3-.2.4-.3 1-.4 2.1-.1 1.2-.1 1.6-.1 4.7s0 3.5.1 4.7c.1 1.1.2 1.7.4 2.1.2.5.4.9.8 1.3.4.4.8.6 1.3.8.4.2 1 .3 2.1.4 1.2.1 1.6.1 4.7.1s3.5 0 4.7-.1c1.1-.1 1.7-.2 2.1-.4.5-.2.9-.4 1.3-.8.4-.4.6-.8.8-1.3.2-.4.3-1 .4-2.1.1-1.2.1-1.6.1-4.7s0-3.5-.1-4.7c-.1-1.1-.2-1.7-.4-2.1-.2-.5-.4-.9-.8-1.3-.4-.4-.8-.6-1.3-.8-.4-.2-1-.3-2.1-.4-1.2-.1-1.6-.1-4.7-.1zm0 3.1a4.9 4.9 0 1 1 0 9.8 4.9 4.9 0 0 1 0-9.8zm0 8.1a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4zm6.3-8.3a1.2 1.2 0 1 1-2.3 0 1.2 1.2 0 0 1 2.3 0z"/>
+                </svg>
+              </a>
+            </div>
           </div>
         </div>
       </div>
@@ -235,6 +254,42 @@
                 <span id="logoSizeValue" class="range-value">56px</span>
               </div>
               <input type="range" id="editLogoSize" min="20" max="200" value="56" class="range-input">
+            </div>
+
+            <!-- ── Contact info (address, phone, social) ───────────────── -->
+            <div class="field span-2 section-divider">
+              <span class="section-label">Kontaktinfo</span>
+            </div>
+            <div class="field span-2">
+              <div class="label-row">
+                <label>Adresse</label>
+                <label class="toggle toggle-sm" title="Vis adresse">
+                  <input type="checkbox" id="editShowAddress">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <textarea id="editAddress" rows="2" placeholder="Nørregade 22&#10;9480 Løkken"></textarea>
+            </div>
+            <div class="field">
+              <div class="label-row">
+                <label>Telefon</label>
+                <label class="toggle toggle-sm" title="Vis telefonnummer">
+                  <input type="checkbox" id="editShowPhone">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <input type="text" id="editPhone" placeholder="+45 12 34 56 78">
+            </div>
+            <div class="field">
+              <div class="label-row">
+                <label>Social-ikoner</label>
+                <label class="toggle toggle-sm" title="Vis social-ikoner">
+                  <input type="checkbox" id="editShowSocial">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <input type="url" id="editFacebookUrl" placeholder="Facebook URL" style="margin-bottom:6px">
+              <input type="url" id="editInstagramUrl" placeholder="Instagram URL">
             </div>
           </div>
         </div>

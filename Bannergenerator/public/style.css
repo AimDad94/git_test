@@ -783,6 +783,52 @@ body {
   white-space: nowrap;
 }
 
+/* Contact info elements (address, phone, social) — sit at the bottom strip
+   in zoned layouts, but can also be free-floating like the logo. */
+.banner-address {
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(255,255,255,0.92);
+  white-space: pre-line;     /* honour newlines from textarea */
+  text-align: left;
+}
+
+.banner-phone {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.95);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.banner-phone .banner-icon {
+  width: 1em;
+  height: 1em;
+  flex-shrink: 0;
+}
+
+.banner-social {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255,255,255,0.95);
+}
+.banner-social-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: inherit;
+  text-decoration: none;
+  transition: opacity .15s;
+}
+.banner-social-link:hover { opacity: 0.8; }
+.banner-social .banner-icon {
+  width: 100%;
+  height: 100%;
+}
+
 /* ── Right Sidebar: Customize ─────────────────────────────────────────────── */
 .customize-sidebar {
   background: var(--sidebar-bg);
