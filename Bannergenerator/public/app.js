@@ -18,8 +18,9 @@ const DEFAULT_POSITIONS = {
   // Contact-strip elements — bottom row by default. Sit alongside CTA in
   // free-floating layouts, get repositioned by zoned layouts that include them.
   address:     { x: 100, y: 290 },  // bottom-left
-  phone:       { x: 360, y: 290 },  // bottom-centre
-  social:      { x: 540, y: 290 },  // bottom-right
+  phone:       { x: 320, y: 290 },  // bottom-centre-left
+  email:       { x: 470, y: 290 },  // bottom-centre-right
+  social:      { x: 560, y: 290 },  // bottom-right
 };
 
 function clonePositions(src) {
@@ -53,13 +54,15 @@ const state = {
   // Scraped logo candidates from last analyze pass (shown in the logo picker)
   scrapedLogos: [],
   // Contact info — free-floating elements like the logo. Multi-line address,
-  // phone number, and Facebook/Instagram links rendered as small icons.
+  // phone number, email and Facebook/Instagram links rendered as small icons.
   address: '',
   phone: '',
+  email: '',
   facebookUrl: '',
   instagramUrl: '',
   showAddress: false,
   showPhone: false,
+  showEmail: false,
   showSocial: false,
   // Background
   selectedImageBase64: null,
@@ -355,6 +358,7 @@ const ELEMENT_IDS = {
   tagline:     'previewTagline',
   address:     'previewAddress',
   phone:       'previewPhone',
+  email:       'previewEmail',
   social:      'previewSocial',
 };
 
@@ -384,6 +388,7 @@ function isElementVisible(key) {
   if (key === 'tagline')     return !!state.showTagline     && !!state.tagline;
   if (key === 'address')     return !!state.showAddress     && !!state.address;
   if (key === 'phone')       return !!state.showPhone       && !!state.phone;
+  if (key === 'email')       return !!state.showEmail       && !!state.email;
   if (key === 'social')      return !!state.showSocial      && !!(state.facebookUrl || state.instagramUrl);
   return false;
 }
@@ -493,6 +498,7 @@ async function shuffleLayout() {
     const autoEnable = {
       address: () => !!state.address,
       phone:   () => !!state.phone,
+      email:   () => !!state.email,
       social:  () => !!(state.facebookUrl || state.instagramUrl),
       logo:    () => !!(state.logoBase64 || state.logoUrl),
     };
@@ -501,6 +507,7 @@ async function shuffleLayout() {
         if (autoEnable[k] && autoEnable[k]()) {
           if (k === 'address') state.showAddress = true;
           if (k === 'phone')   state.showPhone   = true;
+          if (k === 'email')   state.showEmail   = true;
           if (k === 'social')  state.showSocial  = true;
           if (k === 'logo')    state.showLogo    = true;
         }
@@ -581,6 +588,7 @@ function snapshotVariant() {
     showLogo:          state.showLogo,
     showAddress:       state.showAddress,
     showPhone:         state.showPhone,
+    showEmail:         state.showEmail,
     showSocial:        state.showSocial,
   };
   for (const k of VARIANT_KEYS) snap[k] = state[k];
@@ -597,6 +605,7 @@ function applyVariant(snap) {
   if (typeof snap.showLogo === 'boolean') state.showLogo = snap.showLogo;
   if (typeof snap.showAddress === 'boolean') state.showAddress = snap.showAddress;
   if (typeof snap.showPhone   === 'boolean') state.showPhone   = snap.showPhone;
+  if (typeof snap.showEmail   === 'boolean') state.showEmail   = snap.showEmail;
   if (typeof snap.showSocial  === 'boolean') state.showSocial  = snap.showSocial;
   populateEditors();
   renderPreview();
@@ -1141,6 +1150,16 @@ function renderPreview() {
   phone.style.textShadow = textGlyphShadow(phoneColor);
   phone.style.display = isElementVisible('phone') ? '' : 'none';
 
+  // Email (icon + address)
+  const email = $('previewEmail');
+  email.querySelector('.banner-email-addr').textContent = state.email;
+  const emailColor = effectiveTextColor('email', state.primaryColor);
+  email.style.color = emailColor;
+  email.style.left = (pos.email?.x ?? DEFAULT_POSITIONS.email.x) + 'px';
+  email.style.top  = (pos.email?.y ?? DEFAULT_POSITIONS.email.y) + 'px';
+  email.style.textShadow = textGlyphShadow(emailColor);
+  email.style.display = isElementVisible('email') ? '' : 'none';
+
   // Social icons (Facebook + Instagram)
   const social = $('previewSocial');
   const fb = $('previewFacebook');
@@ -1255,10 +1274,12 @@ function syncFromEditors() {
   // Contact info
   state.address      = $('editAddress').value;
   state.phone        = $('editPhone').value;
+  state.email        = $('editEmail').value.trim();
   state.facebookUrl  = $('editFacebookUrl').value.trim();
   state.instagramUrl = $('editInstagramUrl').value.trim();
   state.showAddress  = $('editShowAddress').checked;
   state.showPhone    = $('editShowPhone').checked;
+  state.showEmail    = $('editShowEmail').checked;
   state.showSocial   = $('editShowSocial').checked;
 
   state.primaryColor  = $('editPrimaryColor').value;
@@ -1326,10 +1347,12 @@ function populateEditors() {
   // Contact info
   $('editAddress').value          = state.address || '';
   $('editPhone').value            = state.phone || '';
+  $('editEmail').value            = state.email || '';
   $('editFacebookUrl').value      = state.facebookUrl || '';
   $('editInstagramUrl').value     = state.instagramUrl || '';
   $('editShowAddress').checked    = !!state.showAddress;
   $('editShowPhone').checked      = !!state.showPhone;
+  $('editShowEmail').checked      = !!state.showEmail;
   $('editShowSocial').checked     = !!state.showSocial;
 
   $('editPrimaryColor').value   = state.primaryColor;
@@ -1455,10 +1478,12 @@ async function handleAnalyze(e) {
       elementTextAligns: {},
       address:        analysis.address      || '',
       phone:          analysis.phone        || '',
+      email:          analysis.email        || '',
       facebookUrl:    analysis.facebookUrl  || '',
       instagramUrl:   analysis.instagramUrl || '',
       showAddress:    !!(analysis.address),
       showPhone:      !!(analysis.phone),
+      showEmail:      !!(analysis.email),
       showSocial:     !!(analysis.facebookUrl || analysis.instagramUrl),
     });
 
@@ -1790,10 +1815,12 @@ async function handleSave() {
     brandTokens: state.brandTokens || null,
     address: state.address,
     phone: state.phone,
+    email: state.email,
     facebookUrl: state.facebookUrl,
     instagramUrl: state.instagramUrl,
     showAddress: state.showAddress,
     showPhone: state.showPhone,
+    showEmail: state.showEmail,
     showSocial: state.showSocial,
   };
 
@@ -1993,10 +2020,12 @@ function loadBanner(b) {
     brandTokens:         b.brandTokens || null,
     address:             b.address      || '',
     phone:               b.phone        || '',
+    email:               b.email        || '',
     facebookUrl:         b.facebookUrl  || '',
     instagramUrl:        b.instagramUrl || '',
     showAddress:         !!b.showAddress,
     showPhone:           !!b.showPhone,
+    showEmail:           !!b.showEmail,
     showSocial:          !!b.showSocial,
   });
 
@@ -2093,10 +2122,12 @@ function resetBanner() {
     brandTokens: null,
     address: '',
     phone: '',
+    email: '',
     facebookUrl: '',
     instagramUrl: '',
     showAddress: false,
     showPhone: false,
+    showEmail: false,
     showSocial: false,
   });
   populateEditors();
@@ -2606,13 +2637,13 @@ function init() {
     'editLogoSize',
     'editCtaFontSize', 'editCtaBorderRadius', 'editCtaPaddingV', 'editCtaPaddingH',
     'editCtaFontWeight',
-    'editAddress', 'editPhone', 'editFacebookUrl', 'editInstagramUrl',
-    'editShowAddress', 'editShowPhone', 'editShowSocial',
+    'editAddress', 'editPhone', 'editEmail', 'editFacebookUrl', 'editInstagramUrl',
+    'editShowAddress', 'editShowPhone', 'editShowEmail', 'editShowSocial',
   ];
   liveEditors.forEach((id) => $(id).addEventListener('input', syncFromEditors));
   // Checkboxes need 'change' too (some browsers fire only 'change' for them)
   ['editShowCompanyName','editShowHeadline','editShowSubtext','editShowTagline','editShowCta','editShowOverlay','editShowLogo',
-   'editShowAddress','editShowPhone','editShowSocial']
+   'editShowAddress','editShowPhone','editShowEmail','editShowSocial']
     .forEach((id) => $(id).addEventListener('change', syncFromEditors));
 
   // Logo URL input + clear button

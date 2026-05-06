@@ -793,7 +793,8 @@ body {
   text-align: left;
 }
 
-.banner-phone {
+.banner-phone,
+.banner-email {
   font-size: 13px;
   font-weight: 600;
   color: rgba(255,255,255,0.95);
@@ -801,10 +802,17 @@ body {
   align-items: center;
   gap: 6px;
 }
-.banner-phone .banner-icon {
+.banner-phone .banner-icon,
+.banner-email .banner-icon {
   width: 1em;
   height: 1em;
   flex-shrink: 0;
+}
+/* Email font weight is a touch lighter than phone — phone numbers carry more
+   visual weight in CTAs, email is supporting info. */
+.banner-email {
+  font-weight: 500;
+  font-size: 12px;
 }
 
 .banner-social {
