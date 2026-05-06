@@ -426,7 +426,10 @@
     <section class="col usikker">
       <h2>
         Andre henvendelser <span class="badge warn" id="cnt-usikker">0</span>
-        <button class="bulk-btn" data-bulk="usikker" title="Arkivér alle andre henvendelser">🗑 Arkivér alle</button>
+        <span style="display:flex;gap:6px;margin-left:auto">
+          <button class="bulk-btn" id="usikker-move-btn" title="Flyt alle andre henvendelser til Intern Support / New pipeline">↪ Flyt til Intern Support</button>
+          <button class="bulk-btn" data-bulk="usikker" title="Arkivér alle andre henvendelser">🗑 Arkivér alle</button>
+        </span>
       </h2>
       <div id="list-usikker"></div>
     </section>
@@ -682,6 +685,9 @@
               <option value="">↪ Flyt til…</option>
               ${moveOptions}
             </select>
+            <button class="intern-btn" title="Flyt denne ticket til Intern Support / New pipeline">
+              ↪ Intern
+            </button>
             <button class="archive-btn" title="Arkivér alle tickets fra denne afsender" ${senderEmail ? '' : 'disabled'}>
               🗑 Afsender
             </button>
@@ -708,6 +714,11 @@
           openArchiveDialog(senderEmail);
         });
       }
+      const internBtn = div.querySelector('.intern-btn');
+      internBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await moveTicketToInternal(t.id, t, internBtn);
+      });
       const moveSelect = div.querySelector('.move-select');
       moveSelect.addEventListener('click', (e) => e.stopPropagation());
       moveSelect.addEventListener('change', async (e) => {
@@ -718,6 +729,21 @@
       });
       div.addEventListener('click', () => openDetail(t));
       return div;
+    }
+
+    async function moveTicketToInternal(id, ticket, btn) {
+      const orig = btn ? btn.textContent : '';
+      if (btn) { btn.disabled = true; btn.textContent = 'Flytter…'; }
+      try {
+        const res = await fetch('/api/tickets/' + id + '/move-to-internal', { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'fejl');
+        showToast(`Flyttet "${(ticket.subject||'').slice(0,40)}" → Intern Support / New`);
+        await load(true);
+      } catch (err) {
+        if (btn) { btn.disabled = false; btn.textContent = orig; }
+        showToast('Fejl ved flytning: ' + err.message, true);
+      }
     }
 
     async function moveTicket(id, verdict, ticket) {
@@ -1161,51 +1187,70 @@
       $('#bulk-archive-dialog').showModal();
     }
 
-    $('#opsig-move-btn').addEventListener('click', () => {
+    let pendingMoveToInternal = null;
+
+    function openMoveToInternalDialog({ verdict, noun, endpoint }) {
       if (!lastPayload) return;
-      const opsig = lastPayload.tickets.filter(t => t.verdict === 'opsigelse');
-      if (!opsig.length) {
-        showToast('Ingen opsigelser at flytte');
+      const tickets = lastPayload.tickets.filter(t => t.verdict === verdict);
+      if (!tickets.length) {
+        showToast(`Ingen ${noun} at flytte`);
         return;
       }
-      $('#om-summary').innerHTML = `<strong>${opsig.length} opsigelser</strong> flyttes til Intern Support / New:`;
+      pendingMoveToInternal = { endpoint, noun, count: tickets.length };
+      $('#om-summary').innerHTML = `<strong>${tickets.length} ${noun}</strong> flyttes til Intern Support / New:`;
       const list = $('#om-preview');
       list.innerHTML = '';
-      opsig.slice(0, 5).forEach(t => {
+      tickets.slice(0, 5).forEach(t => {
         const li = document.createElement('li');
         const c = (t.contact && t.contact.email) ? ` (${t.contact.email})` : '';
         li.textContent = (t.subject || '(uden emne)') + c;
         list.appendChild(li);
       });
-      if (opsig.length > 5) {
+      if (tickets.length > 5) {
         const li = document.createElement('li');
         li.style.fontStyle = 'italic';
-        li.textContent = `… og ${opsig.length - 5} mere`;
+        li.textContent = `… og ${tickets.length - 5} mere`;
         list.appendChild(li);
       }
       $('#om-confirm').disabled = false;
-      $('#om-confirm').textContent = `Flyt ${opsig.length} opsigelser`;
+      $('#om-confirm').textContent = `Flyt ${tickets.length} ${noun}`;
       $('#opsig-dialog').showModal();
-    });
+    }
+
+    $('#opsig-move-btn').addEventListener('click', () => openMoveToInternalDialog({
+      verdict: 'opsigelse',
+      noun: 'opsigelser',
+      endpoint: '/api/opsigelser/move-to-internal'
+    }));
+
+    $('#usikker-move-btn').addEventListener('click', () => openMoveToInternalDialog({
+      verdict: 'usikker',
+      noun: 'andre henvendelser',
+      endpoint: '/api/usikker/move-to-internal'
+    }));
 
     $('#om-cancel').addEventListener('click', () => $('#opsig-dialog').close());
 
     $('#om-confirm').addEventListener('click', async () => {
+      if (!pendingMoveToInternal) return;
+      const { endpoint, noun } = pendingMoveToInternal;
       const btn = $('#om-confirm');
       const orig = btn.textContent;
       btn.disabled = true;
       btn.textContent = 'Flytter…';
       try {
-        const res = await fetch('/api/opsigelser/move-to-internal', { method: 'POST' });
+        const res = await fetch(endpoint, { method: 'POST' });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'fejl');
         $('#opsig-dialog').close();
-        showToast(`${data.moved} opsigelser flyttet til Intern Support / New`);
+        showToast(`${data.moved} ${noun} flyttet til Intern Support / New`);
         await load(true);
       } catch (err) {
         btn.disabled = false;
         btn.textContent = orig;
         showToast('Fejl: ' + err.message, true);
+      } finally {
+        pendingMoveToInternal = null;
       }
     });
 

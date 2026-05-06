@@ -1024,6 +1024,29 @@ app.post('/api/tickets/archive-by-sender', async (req, res) => {
 const INTERN_SUPPORT_PIPELINE_ID = '25053937';
 const INTERN_SUPPORT_NEW_STAGE_ID = '78372571';
 
+async function moveTicketsToInternalNew(ids) {
+  for (let i = 0; i < ids.length; i += 100) {
+    const chunk = ids.slice(i, i + 100);
+    const resp = await fetch(`${HS}/crm/v3/objects/tickets/batch/update`, {
+      method: 'POST',
+      headers: HEADERS,
+      body: JSON.stringify({
+        inputs: chunk.map(id => ({
+          id,
+          properties: {
+            hs_pipeline: INTERN_SUPPORT_PIPELINE_ID,
+            hs_pipeline_stage: INTERN_SUPPORT_NEW_STAGE_ID
+          }
+        }))
+      })
+    });
+    if (!resp.ok) {
+      const txt = await resp.text();
+      throw new Error(`HubSpot ${resp.status}: ${txt.slice(0, 300)}`);
+    }
+  }
+}
+
 app.post('/api/opsigelser/move-to-internal', async (_req, res) => {
   try {
     const payload = await ensurePayload();
@@ -1031,28 +1054,40 @@ app.post('/api/opsigelser/move-to-internal', async (_req, res) => {
     if (!opsigelser.length) return res.json({ moved: 0, message: 'Ingen opsigelser at flytte' });
 
     const ids = opsigelser.map(t => t.id);
-    for (let i = 0; i < ids.length; i += 100) {
-      const chunk = ids.slice(i, i + 100);
-      const resp = await fetch(`${HS}/crm/v3/objects/tickets/batch/update`, {
-        method: 'POST',
-        headers: HEADERS,
-        body: JSON.stringify({
-          inputs: chunk.map(id => ({
-            id,
-            properties: {
-              hs_pipeline: INTERN_SUPPORT_PIPELINE_ID,
-              hs_pipeline_stage: INTERN_SUPPORT_NEW_STAGE_ID
-            }
-          }))
-        })
-      });
-      if (!resp.ok) {
-        const txt = await resp.text();
-        throw new Error(`HubSpot ${resp.status}: ${txt.slice(0, 300)}`);
-      }
-    }
+    await moveTicketsToInternalNew(ids);
     cache = { fetchedAt: 0, payload: null };
     console.log(`[opsigelser] ${ids.length} flyttet til Intern Support / New`);
+    res.json({ moved: ids.length, ids });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/tickets/:id/move-to-internal', async (req, res) => {
+  try {
+    const id = req.params.id;
+    if (!id) return res.status(400).json({ error: 'ticket id mangler' });
+    await moveTicketsToInternalNew([id]);
+    cache = { fetchedAt: 0, payload: null };
+    console.log(`[move-to-internal] ticket ${id} flyttet til Intern Support / New`);
+    res.json({ moved: 1, id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/usikker/move-to-internal', async (_req, res) => {
+  try {
+    const payload = await ensurePayload();
+    const usikker = payload.tickets.filter(t => t.verdict === 'usikker');
+    if (!usikker.length) return res.json({ moved: 0, message: 'Ingen andre henvendelser at flytte' });
+
+    const ids = usikker.map(t => t.id);
+    await moveTicketsToInternalNew(ids);
+    cache = { fetchedAt: 0, payload: null };
+    console.log(`[usikker] ${ids.length} andre henvendelser flyttet til Intern Support / New`);
     res.json({ moved: ids.length, ids });
   } catch (err) {
     console.error(err);
